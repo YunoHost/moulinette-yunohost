@@ -269,7 +269,7 @@ def make_argument_list(action_map: dict, spaces: str = 4 * " ") -> str:
         if argument_name[0] != "-":
             position += 1
             # This parameter may be used more than once, else we use the position counter
-            if argument_details.get("nargs", "") in "+*":
+            if argument_details.get("nargs", "") in ["+", "*"]:
                 if argument_details["nargs"] == "+":
                     arg["spec"] = "'{{{},*}}'".format(str(position))
                 else:  # argument_details["nargs"] == "*":
@@ -312,7 +312,7 @@ def make_argument_list(action_map: dict, spaces: str = 4 * " ") -> str:
 
             has_action = True
             # Add a pattern field to match multiple arguments
-            if argument_details.get("nargs", "") in "+*":
+            if argument_details.get("nargs", "") in ["+", "*"]:
                 if arg["excludes"]:
                     # suppose that `arg["excludes"] = (-f --foo)`
                     arg["excludes"] = "(* " + arg["excludes"][1:]
@@ -666,11 +666,9 @@ function _yunohost_COMMAND() {
         YNH_SUBCATEGORY
     fi
 }
-''',
-
+""",
     # --------------------------------------------------------------------
-    'subcategory':
-        r'''
+    "subcategory": r"""
         local -a yunohost_COMMAND_subcategories; yunohost_COMMAND_subcategories=(
             YNH_SUBCACTEGORIES_DESCRIPTION
         )
