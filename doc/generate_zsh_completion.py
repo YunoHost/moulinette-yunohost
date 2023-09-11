@@ -146,7 +146,9 @@ def make_category(category_name: str, category_map: dict) -> str:
     # First, complete the main action map
     for action, action_details in category_map["actions"].items():
         # Empty element failsafe
-        if "action_help" not in action_details and "arguments" not in action_details:
+        if action_details.get("hide_in_help", False) or (
+            "action_help" not in action_details and "arguments" not in action_details
+        ):
             continue
 
         # Adding the new action to the map of the category
@@ -258,6 +260,16 @@ def make_argument_list(action_map: dict, spaces: str = 4 * " ") -> str:
         # Forcing to str, as the yaml parser inteprets numbers as integers
         # (eg.: `firewall allow... -4`)
         argument_name = str(argument_name)
+
+        #
+        # Check if the argument should be hidden (API only)
+        #
+        if (
+            argument_details.get("extra", {})
+            .get("autocomplete", {})
+            .get("hide_in_help", False)
+        ):
+            continue
 
         #
         # Generation of the completion hints
@@ -580,7 +592,7 @@ __yunohost_cache_policy(){
     local -a oldp
     # oldp=( "$1"(mM+1) ) # month
     # oldp=( "$1"(Nm+7) ) # 1 week
-    oldp=( "$1"(Nmm+1) ) # 1 min
+    oldp=( "$1"(Nmd+1) ) # 1 day
     (( $#oldp )) && return
     return 1
 }

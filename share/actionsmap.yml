@@ -171,9 +171,9 @@ user:
                     help: Username to delete
                     extra:
                         pattern: *pattern_username
-                        autocomplete: &usernames_and_mails_list
-                            ynh_selector: user list
-                            jq_selector: '.users[].username, .users[].mail'
+                        autocomplete: &users_list
+                            ynh_selector: user list --fields username
+                            jq_selector: '.users[].username'
                             use_cache: false
                 --purge:
                     help: Purge user's home and mail directories
@@ -187,10 +187,7 @@ user:
                 username:
                     help: Username to update
                     extra:
-                        autocomplete: &users_list
-                            ynh_selector: user list --fields username
-                            jq_selector: '.users[].username'
-                            use_cache: false
+                        autocomplete: *users_list
                 -F:
                     full: --fullname
                     help: The full name of the user. For example 'Camille Dupont'
@@ -262,7 +259,7 @@ user:
                 username:
                     help: Username or email to get information
                     extra:
-                        autocomplete: *usernames_and_mails_list
+                        autocomplete: *users_list
 
         ### user_export()
         export:
@@ -279,7 +276,7 @@ user:
                     type: open
                     extra:
                         autocomplete:
-                            zsh_completion: _file
+                            zsh_completion: _files
                 -u:
                     full: --update
                     help: Update all existing users contained in the CSV file (by default existing users are ignored)
@@ -728,7 +725,7 @@ domain:
 
         ### domain_url_available()
         url-available:
-            hide_in_help: True
+            hide_in_help: true
             action_help: Check availability of a web path
             api: GET /domain/<domain>/urlavailable
             arguments:
@@ -743,7 +740,7 @@ domain:
 
         ### domain_action_run()
         action-run:
-            hide_in_help: True
+            hide_in_help: true
             action_help: Run domain action
             api: PUT /domain/<domain>/actions/<action>
             arguments:
@@ -993,11 +990,17 @@ app:
                 app:
                     help: Name, local path or git URL of the app to fetch the manifest of
                     extra:
-                        autocomplete: *apps_list
+                        autocomplete: &apps_catalog_list
+                            ynh_selector: app catalog
+                            jq_selector: '.apps | keys[]'
+                            use_cache: true
                 -s:
                     full: --with-screenshot
                     help: Also return a base64 screenshot if any (API only)
                     action: store_true
+                    extra:
+                        autocomplete:
+                            hide_in_help: true
 
         ### app_list()
         list:
@@ -1056,7 +1059,7 @@ app:
                 app:
                     help: Name, local path or git URL of the app to install
                     extra:
-                        autocomplete: *apps_list
+                        autocomplete: *apps_catalog_list
                 -l:
                     full: --label
                     help: Custom name for the app
@@ -1171,7 +1174,7 @@ app:
 
         ### app_register_url()
         register-url:
-            hide_in_help: True
+            hide_in_help: true
             action_help: Book/register a web path for a given app
             arguments:
                 app:
@@ -1188,7 +1191,7 @@ app:
 
         ### app_makedefault()
         makedefault:
-            hide_in_help: True
+            hide_in_help: true
             action_help: Redirect domain root to an app
             api: PUT /apps/<app>/default
             arguments:
@@ -1208,7 +1211,7 @@ app:
 
         ### app_dismiss_notification
         dismiss-notification:
-            hide_in_help: True
+            hide_in_help: true
             action_help: Dismiss post_install or post_upgrade notification
             api: PUT /apps/<app>/dismiss_notification/<name>
             arguments:
@@ -1417,14 +1420,12 @@ backup:
 
         ### backup_download()
         download:
-            hide_in_help: True
+            hide_in_help: true
             action_help: (API only) Request to download the file
             api: GET /backups/<name>/download
             arguments:
                 name:
                     help: Name of the local backup archive
-                    extra:
-                        autocomplete: *backups_list
 
         ### backup_delete()
         delete:
@@ -2092,7 +2093,7 @@ hook:
 
         ### hook_info()
         info:
-            hide_in_help: True
+            hide_in_help: true
             action_help: Get information about a given hook
             arguments:
                 action:
@@ -2142,7 +2143,7 @@ hook:
 
         ### hook_callback()
         callback:
-            hide_in_help: True
+            hide_in_help: true
             action_help: Execute all scripts binded to an action
             arguments:
                 action:
@@ -2166,7 +2167,7 @@ hook:
 
         ### hook_exec()
         exec:
-            hide_in_help: True
+            hide_in_help: true
             action_help: Execute hook from a file with arguments
             arguments:
                 path:
