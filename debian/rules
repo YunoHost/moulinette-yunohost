@@ -7,4 +7,5 @@
 override_dh_auto_build:
 	# Generate bash completion file
 	python3 doc/generate_bash_completion.py
+	python3 doc/generate_zsh_completion.py
 	python3 doc/generate_manpages.py --gzip --output doc/yunohost.8.gz

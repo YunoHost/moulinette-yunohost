@@ -6,5 +6,6 @@ conf/* /usr/share/yunohost/conf/
 locales/* /usr/share/yunohost/locales/
 doc/yunohost.8.gz /usr/share/man/man8/
 doc/bash_completion.d/* /etc/bash_completion.d/
+doc/yunohost_zsh_completion /usr/share/zsh/vendor-completions/_yunohost
 conf/metronome/modules/* /usr/lib/metronome/modules/
 src/* /usr/lib/python3/dist-packages/yunohost/
