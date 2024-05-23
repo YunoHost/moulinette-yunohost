@@ -505,6 +505,11 @@ ynh_add_config() {
         ynh_die --message="The provided template $template doesn't exist"
     fi
 
+    # Backup variables handled by the config panel
+    local configpanel_backup_path
+    configpanel_backup_path="$(mktemp)"
+    yunohost app config get $app --export > "$configpanel_backup_path"
+
     ynh_backup_if_checksum_is_different --file="$destination"
 
     # Make sure to set the permissions before we copy the file
@@ -522,6 +527,12 @@ ynh_add_config() {
     ynh_replace_vars --file="$destination"
 
     ynh_store_file_checksum --file="$destination"
+
+    # Restore variables handled by the config panel
+    yunohost app config set $app -f "$configpanel_backup_path"
+    ynh_secure_remove --file="$configpanel_backup_path"
+    ynh_store_file_checksum --file="$destination"
+
 }
 
 # Replace variables in a file
