@@ -623,7 +623,6 @@ class BaseInputOption(BaseOption):
     redact: bool = False
     optional: bool = False  # FIXME keep required as default?
     default: Any = None
-    _annotation: Any = Any
     _none_as_empty_str: ClassVar[bool] = True
 
     @field_validator("default", mode="before")
@@ -644,21 +643,6 @@ class BaseInputOption(BaseOption):
         if isinstance(value, str):
             value = value.strip()
         return value
-
-    @property
-    def _dynamic_annotation(self) -> Any:
-        """
-        Returns the expected type of an Option's value.
-        This may be dynamic based on constraints.
-        """
-        return self._annotation
-
-    @property
-    def _validators(self) -> dict[str, Callable]:
-        return {
-            "pre": self._value_pre_validator,
-            "post": self._value_post_validator,
-        }
 
     def _get_field_attrs(self) -> dict[str, Any]:
         """
@@ -689,20 +673,8 @@ class BaseInputOption(BaseOption):
 
         return attrs
 
-    def _as_dynamic_model_field(self) -> tuple[Any, "FieldInfo"]:
-        """
-        Return a tuple of a type and a Field instance to be injected in a
-        custom form declaration.
-        """
-        attrs = self._get_field_attrs()
-        anno = (
-            self._dynamic_annotation
-            if not self.optional
-            else self._dynamic_annotation | None
-        )
-        field = Field(default=attrs.pop("default", None), **attrs)
-
-        return (anno, field)
+    def get_annotation(self, mode: Mode = "python") -> tuple[Any, "FieldInfo"]:
+        raise NotImplementedError()
 
     def _get_prompt_message(self, value: Any) -> str:
         message = super()._get_prompt_message(value)
@@ -2014,27 +1986,17 @@ def build_form(
     Parsing/validation occurs at instanciation and assignements.
     To avoid validation at instanciation, use `my_form.model_construct(**values)`
     """
-    options_as_fields: Any = {}
-    validators: dict[str, Any] = {}
-
-    for option in options:
-        if not isinstance(option, BaseInputOption):
-            continue  # filter out non input options
-
-        options_as_fields[option.id] = option._as_dynamic_model_field()
-        option_validators = option._validators
-
-        for step in ("pre", "post"):
-            validators[f"{option.id}_{step}_validator"] = field_validator(
-                option.id, mode="before" if step == "pre" else "after"
-            )(option_validators[step])
+    options_as_fields: Any = {
+        option.id: option.get_annotation()
+        for option in options
+        if isinstance(option, BaseInputOption)
+    }
 
     return cast(
         Type[FormModel],
         create_model(
             name,
             __base__=FormModel,
-            __validators__=validators,
             **options_as_fields,
         ),
     )
@@ -2238,7 +2200,7 @@ def ask_questions_and_parse_answers(
     prefilled_answers: str | Mapping[str, Any] = {},
     current_values: Mapping[str, Any] = {},
     hooks: Hooks = {},
-) -> tuple[list[AnyOption], FormModel]:
+) -> tuple[list[AnyOption], Values]:
     """Parse arguments store in either manifest.json or actions.json or from a
     config panel against the user answers when they are present.
 
@@ -2271,7 +2233,7 @@ def ask_questions_and_parse_answers(
     form = prompt_or_validate_form(
         model_options, form, prefilled_answers=answers, context=context, hooks=hooks
     )
-    return (model_options, form)
+    return (model_options, form.model_dump())
 
 
 @overload
