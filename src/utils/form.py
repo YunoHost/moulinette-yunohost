@@ -698,25 +698,6 @@ class BaseInputOption(BaseOption):
         if value is None and extras["none_as_empty_str"]:
             value = ""
 
-        if not extras.get("redact"):
-            return value
-
-        # Tell the operation_logger to redact all password-type / secret args
-        # Also redact the % escaped version of the password that might appear in
-        # the 'args' section of metadata (relevant for password with non-alphanumeric char)
-        data_to_redact = []
-        if value and isinstance(value, str):
-            data_to_redact.append(value)
-
-        data_to_redact += [
-            urllib.parse.quote(data)
-            for data in data_to_redact
-            if urllib.parse.quote(data) != data
-        ]
-
-        for operation_logger in OperationLogger._instances:
-            operation_logger.data_to_redact.extend(data_to_redact)
-
         return value
 
 

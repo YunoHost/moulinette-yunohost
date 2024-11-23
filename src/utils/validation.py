@@ -1,7 +1,10 @@
 import typing as t
+import urllib
 from dataclasses import dataclass
 from pydantic import ValidationError
 from pydantic_core import PydanticCustomError, PydanticUseDefault, core_schema as cs
+
+from yunohost.log import OperationLogger
 
 if t.TYPE_CHECKING:
     from pydantic import GetCoreSchemaHandler
@@ -40,6 +43,30 @@ def coerce_nonish_to_none(v: t.Any) -> t.Any:
 
 def serialize_none_to_empty_str(v: t.Any) -> t.Any:
     return "" if v is None else v
+
+
+# VALIDATORS
+
+
+def redact(v: t.Any) -> t.Any:
+    # FIXME should receive serialized value?
+    if not v or not isinstance(v, str):
+        return v
+
+    # Tell the operation_logger to redact all password-type / secret args
+    # Also redact the % escaped version of the password that might appear in
+    # the 'args' section of metadata (relevant for password with non-alphanumeric char)
+    data_to_redact = [v]
+    data_to_redact += [
+        urllib.parse.quote(data)
+        for data in data_to_redact
+        if urllib.parse.quote(data) != data
+    ]
+
+    for operation_logger in OperationLogger._instances:
+        operation_logger.data_to_redact.extend(data_to_redact)
+
+    return v
 
 
 # CORE SCHEMA HELPERS
