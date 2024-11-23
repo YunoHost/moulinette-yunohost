@@ -656,7 +656,6 @@ class BaseInputOption(BaseOption):
         attrs: dict[str, Any] = {}
         attrs["json_schema_extra"] = {
             "redact": self.redact,  # extra
-            "none_as_empty_str": self._none_as_empty_str,
         }
 
         if self.readonly:
@@ -666,10 +665,10 @@ class BaseInputOption(BaseOption):
             attrs["examples"] = [self.example]
 
         if self.default is not None:
-            attrs["default"] = self.default
+            attrs["default_factory"] = lambda: self.default
             attrs["validate_default"] = True
-        else:
-            attrs["default"] = ... if not self.optional else None
+        elif not self.optional:
+            attrs["default"] = ...
 
         return attrs
 
