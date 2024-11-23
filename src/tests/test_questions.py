@@ -681,6 +681,9 @@ class TestString(BaseTest):
             ("value\nvalue", "value\nvalue"),
             (" ##value \n \tvalue\n  ", "##value \n \tvalue"),
         ], reason=r"should fail or without `\n`?"),
+        # test pattern
+        ("value", FAIL, {"pattern": {"regexp": r'^[A-F]\d\d$', "error": "Provide a room like F12 : one uppercase and 2 numbers"}}),
+        ("F12", "F12", {"pattern": {"regexp": r'^[A-F]\d\d$', "error": "Provide a room like F12 : one uppercase and 2 numbers"}}),
         # readonly
         ("overwrite", "expected value", {"readonly": True, "default": "expected value"}),  # FIXME do we want to fail instead?
     ]
