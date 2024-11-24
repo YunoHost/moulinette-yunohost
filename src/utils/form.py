@@ -64,6 +64,7 @@ from yunohost.utils.i18n import _value_for_locale
 from yunohost.utils.validation import (
     FORBIDDEN_PASSWORD_CHARS,
     BaseConstraints,
+    BooleanConstraints,
     Mode,
     NumberConstraints,
     PasswordConstraints,
@@ -934,11 +935,27 @@ class BooleanOption(BaseInputOption):
     type: Literal[OptionType.boolean] = OptionType.boolean
     yes: Any = 1
     no: Any = 0
-    default: bool | int | str | None = 0
-    _annotation = bool | int | str
+    default: bool | int | str | None = False
     _yes_answers: ClassVar[set[str]] = {"1", "yes", "y", "true", "t", "on"}
     _no_answers: ClassVar[set[str]] = {"0", "no", "n", "false", "f", "off"}
-    _none_as_empty_str = False
+
+    @field_validator("yes")
+    @classmethod
+    def yes_is_not_falsy(cls, v: Any) -> Any:
+        assert (
+            str(v).lower() not in cls._no_answers
+        ), f"'yes' value can't be in {cls._no_answers}"
+
+        return v
+
+    @field_validator("no")
+    @classmethod
+    def no_is_not_truthy(cls, v: Any) -> Any:
+        assert (
+            str(v).lower() not in cls._yes_answers
+        ), f"'yes' value can't be in {cls._yes_answers}"
+
+        return v
 
     @staticmethod
     def humanize(value, option={}) -> str:
@@ -1003,16 +1020,18 @@ class BooleanOption(BaseInputOption):
             choices="yes/no",
         )
 
-    def get(self, key, default=None):
-        return getattr(self, key, default)
-
-    def _get_field_attrs(self) -> dict[str, Any]:
-        attrs = super()._get_field_attrs()
-        attrs["json_schema_extra"]["parse"] = {  # extra
-            True: self.yes,
-            False: self.no,
-        }
-        return attrs
+    def get_annotation(self, mode: Mode = "bash") -> Any:
+        return (
+            Annotated[
+                bool | None if self.optional else bool,
+                BooleanConstraints(
+                    mode=mode,
+                    has_default=self.default is not None,
+                    serialization=(self.yes, self.no),
+                ),
+            ],
+            Field(**self._get_field_attrs()),
+        )
 
     def _get_prompt_message(self, value: bool | None) -> str:
         message = super()._get_prompt_message(value)
@@ -1021,15 +1040,6 @@ class BooleanOption(BaseInputOption):
             message += " [yes | no]"
 
         return message
-
-    @staticmethod
-    def _value_post_validator(cls, value: bool | None, info: "ValidationInfo") -> Any:
-        if isinstance(value, bool):
-            return cls.model_fields[info.field_name].json_schema_extra["parse"][value]
-
-        return super(BooleanOption, BooleanOption)._value_post_validator(
-            cls, value, info
-        )
 
 
 # ─ TIME ──────────────────────────────────────────────────

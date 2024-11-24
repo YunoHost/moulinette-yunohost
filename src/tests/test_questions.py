@@ -824,9 +824,7 @@ class TestNumber(BaseTest):
         *all_as(False, "0", 0, output=0),  # FIXME should `False` fail instead?
         *all_as(True, "1", 1, output=1),  # FIXME should `True` fail instead?
         *all_as("1337", 1337, output=1337),
-        *xfail(scenarios=[
-            ("-1", -1)
-        ], reason="should output as `-1` instead of failing"),
+        *all_as("-1", -1, output=-1),
         *all_fails(13.37, "13.37"),
 
         *unchanged(10, 5000, 10000, raw_option={"min": 10, "max": 10000}),
@@ -905,7 +903,7 @@ class TestBoolean(BaseTest):
                 {"yes": "0", "no": "1", "optional": True},
             ],
             # "no" for "yes" and "yes" for "no" should fail
-            "scenarios": all_fails("", "y", "n", error=AssertionError),
+            "scenarios": all_fails("", "y", "n", error=YunohostError),
         },
         # readonly
         (1, 0, {"readonly": True, "default": 0}),
