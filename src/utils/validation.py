@@ -7,7 +7,7 @@ from pydantic_core import PydanticCustomError, PydanticUseDefault, core_schema a
 from yunohost.log import OperationLogger
 
 if t.TYPE_CHECKING:
-    from pydantic import GetCoreSchemaHandler
+    from pydantic import GetCoreSchemaHandler, SerializerFunctionWrapHandler
     from pydantic_core import CoreSchema
 
 
@@ -83,6 +83,39 @@ def find_type_schema(schema: "CoreSchema", type_: str) -> t.Union["CoreSchema", 
 
 
 # CONSTRAINTS
+
+
+@dataclass
+class BaseConstraints:
+    mode: Mode = "python"
+    has_default: bool = False
+    redact: bool = False
+    serializer: t.Callable | None = None
+
+    def __get_pydantic_core_schema__(
+        self, source_type: t.Any, handler: "GetCoreSchemaHandler"
+    ) -> "CoreSchema":
+        schema = handler(source_type)
+        schema = cs.no_info_before_validator_function(
+            (coerce_nonish_to_default if self.has_default else coerce_nonish_to_none),
+            schema,
+            serialization=cs.wrap_serializer_function_ser_schema(self.serialize),
+        )
+
+        return schema
+
+    def serialize(self, v: t.Any, handler: "SerializerFunctionWrapHandler") -> t.Any:
+        v = handler(v)
+
+        if self.serializer:
+            v = self.serializer(v)
+
+        v = serialize_none_to_empty_str(v)
+
+        if self.redact:
+            redact(v)
+
+        return v
 
 
 @dataclass
