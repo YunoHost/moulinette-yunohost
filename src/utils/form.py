@@ -65,6 +65,7 @@ from yunohost.utils.validation import (
     FORBIDDEN_PASSWORD_CHARS,
     BaseConstraints,
     Mode,
+    NumberConstraints,
     PasswordConstraints,
     Pattern,
     StringConstraints,
@@ -867,8 +868,6 @@ class NumberOption(BaseInputOption):
     min: int | None = None
     max: int | None = None
     step: int | None = None
-    _annotation = int
-    _none_as_empty_str = False
 
     @staticmethod
     def normalize(value, option={}) -> int | None:
@@ -891,24 +890,20 @@ class NumberOption(BaseInputOption):
             error=m18n.n("invalid_number"),
         )
 
-    def _get_field_attrs(self) -> dict[str, Any]:
-        attrs = super()._get_field_attrs()
-        attrs["ge"] = self.min
-        attrs["le"] = self.max
-        attrs["json_schema_extra"]["step"] = self.step  # extra
-
-        return attrs
-
-    @staticmethod
-    def _value_pre_validator(
-        cls, value: int | None, info: "ValidationInfo"
-    ) -> int | None:
-        value = super(NumberOption, NumberOption)._value_pre_validator(cls, value, info)
-
-        if value is None:
-            return None
-
-        return value
+    def get_annotation(self, mode: Mode = "bash") -> Any:
+        return (
+            Annotated[
+                int | None if self.optional else int,
+                NumberConstraints(
+                    mode=mode,
+                    has_default=self.default is not None,
+                    min=self.min,
+                    max=self.max,
+                    step=self.step,
+                ),
+            ],
+            Field(**self._get_field_attrs()),
+        )
 
 
 # ─ BOOLEAN ───────────────────────────────────────────────
