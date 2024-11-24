@@ -235,3 +235,36 @@ class PasswordConstraints:
             )
 
         return v
+
+
+@dataclass
+class NumberConstraints:
+    mode: Mode = "python"
+    has_default: bool = False
+    min: int | None = None
+    max: int | None = None
+    step: int | None = None
+
+    def __get_pydantic_core_schema__(
+        self, source_type: t.Any, handler: "GetCoreSchemaHandler"
+    ) -> "CoreSchema":
+        schema = handler(source_type)
+        int_schema = find_type_schema(schema, "int")
+
+        if int_schema is None:
+            return schema
+
+        int_schema.update(
+            cs.int_schema(
+                multiple_of=self.step,
+                ge=self.min,
+                le=self.max,
+            ),
+        )
+
+        schema = cs.no_info_before_validator_function(
+            (coerce_nonish_to_default if self.has_default else coerce_nonish_to_none),
+            schema,
+        )
+
+        return schema
