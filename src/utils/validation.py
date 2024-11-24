@@ -140,3 +140,65 @@ class StringConstraints:
                     "string_pattern_mismatch", str(self.pattern.error)
                 )
             raise err
+
+
+FORBIDDEN_PASSWORD_CHARS = r"{}"
+
+
+@dataclass
+class PasswordConstraints:
+    mode: Mode = "python"
+    forbidden_chars: str = FORBIDDEN_PASSWORD_CHARS
+
+    def __get_pydantic_core_schema__(
+        self, source_type: t.Any, handler: "GetCoreSchemaHandler"
+    ) -> "CoreSchema":
+
+        schema = handler(source_type)
+        str_schema = find_type_schema(schema, "str")
+
+        if str_schema is None:
+            return schema
+
+        str_schema.update(
+            cs.no_info_after_validator_function(
+                self.validate,
+                cs.str_schema(
+                    strip_whitespace=True,
+                    max_length=127,
+                    coerce_numbers_to_str=True,
+                ),
+                serialization=cs.plain_serializer_function_ser_schema(redact),
+            )
+        )
+
+        schema = cs.no_info_before_validator_function(
+            coerce_nonish_to_none,
+            schema,
+            serialization=cs.plain_serializer_function_ser_schema(
+                serialize_none_to_empty_str
+            ),
+        )
+
+        return schema
+
+    def validate(self, v: str) -> str:
+        if any(char in v for char in (self.forbidden_chars)):
+            raise PydanticCustomError(
+                "pattern_password_app",
+                "forbidden characters in string: {chars}",  # FIXME trad
+                {"forbidden_chars": self.forbidden_chars},
+            )
+
+        from yunohost.utils.password import PasswordValidator
+
+        validator = PasswordValidator("user")
+        status, error_key = validator.validation_summary(v)
+
+        if status == "error":
+            raise PydanticCustomError(
+                error_key,
+                error_key,  # FIXME trad
+            )
+
+        return v
