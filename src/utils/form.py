@@ -61,7 +61,9 @@ from yunohost.log import OperationLogger
 from yunohost.utils.error import YunohostError, YunohostValidationError
 from yunohost.utils.i18n import _value_for_locale
 from yunohost.utils.validation import (
+    FORBIDDEN_PASSWORD_CHARS,
     Mode,
+    PasswordConstraints,
     Pattern,
     StringConstraints,
     Translation,
@@ -751,9 +753,6 @@ class TextOption(BaseStringOption):
     type: Literal[OptionType.text] = OptionType.text
 
 
-FORBIDDEN_PASSWORD_CHARS = r"{}"
-
-
 class PasswordOption(BaseInputOption):
     """
     Ask for a password.
@@ -775,40 +774,19 @@ class PasswordOption(BaseInputOption):
     example: Literal[None] = None
     default: Literal[None] = None
     redact: Literal[True] = True
-    _annotation = str
     _forbidden_chars: ClassVar[str] = FORBIDDEN_PASSWORD_CHARS
 
-    def _get_field_attrs(self) -> dict[str, Any]:
-        attrs = super()._get_field_attrs()
-
-        attrs["json_schema_extra"]["forbidden_chars"] = self._forbidden_chars  # extra
-
-        return attrs
-
-    @staticmethod
-    def _value_pre_validator(
-        cls, value: str | None, info: "ValidationInfo"
-    ) -> str | None:
-        value = super(PasswordOption, PasswordOption)._value_pre_validator(
-            cls, value, info
+    def get_annotation(self, mode: Mode = "bash") -> tuple[Any, "FieldInfo"]:
+        return (
+            Annotated[
+                str | None if self.optional else str,
+                PasswordConstraints(
+                    mode=mode,
+                    forbidden_chars=self._forbidden_chars,
+                ),
+            ],
+            Field(**self._get_field_attrs()),
         )
-
-        if value is not None and value != "":
-            value = str(value)
-            forbidden_chars: str = cls.model_fields[info.field_name].json_schema_extra[
-                "forbidden_chars"
-            ]
-            if any(char in value for char in forbidden_chars):
-                raise YunohostValidationError(
-                    "pattern_password_app", forbidden_chars=forbidden_chars
-                )
-
-            # If it's an optional argument the value should be empty or strong enough
-            from yunohost.utils.password import assert_password_is_strong_enough
-
-            assert_password_is_strong_enough("user", value)
-
-        return value
 
 
 class ColorOption(BaseInputOption):

@@ -15,7 +15,6 @@ from moulinette import Moulinette
 from yunohost import app, domain, user
 from yunohost.utils.form import (
     OPTIONS,
-    FORBIDDEN_PASSWORD_CHARS,
     READONLY_TYPES,
     ask_questions_and_parse_answers,
     BaseChoicesOption,
@@ -29,6 +28,7 @@ from yunohost.utils.form import (
 )
 from yunohost.utils import form
 from yunohost.utils.error import YunohostError, YunohostValidationError
+from yunohost.utils.validation import FORBIDDEN_PASSWORD_CHARS
 
 
 """
