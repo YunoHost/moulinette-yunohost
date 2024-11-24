@@ -268,3 +268,39 @@ class NumberConstraints:
         )
 
         return schema
+
+
+@dataclass
+class BooleanConstraints:
+    mode: Mode = "python"
+    has_default: bool = False
+    serialization: tuple[int, int] | tuple[bool, bool] | tuple[str, str] = (True, False)
+
+    def __get_pydantic_core_schema__(
+        self, source_type: t.Any, handler: "GetCoreSchemaHandler"
+    ) -> "CoreSchema":
+        schema = handler(source_type)
+        schema = cs.no_info_before_validator_function(
+            self.validate,
+            schema,
+            serialization=cs.plain_serializer_function_ser_schema(
+                self.serialize, when_used="unless-none"
+            ),
+        )
+
+        return schema
+
+    def validate(self, v: t.Any) -> t.Any:
+        v = v.strip().lower() if isinstance(v, str) else v
+        if v in (None, "", "_none", "none"):
+            return None
+
+        if v == self.serialization[0]:
+            return True
+        elif v == self.serialization[1]:
+            return False
+
+        return v
+
+    def serialize(self, v: bool) -> t.Any:
+        return self.serialization[0] if v is True else self.serialization[1]
