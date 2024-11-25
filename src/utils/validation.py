@@ -1,3 +1,4 @@
+import datetime
 import typing as t
 import urllib
 from dataclasses import dataclass
@@ -26,6 +27,15 @@ NONISH_VALUES: t.Final = (None, "")  # null, nil, undefined
 def is_nonish(v: t.Any) -> bool:
     v = v.strip().lower() if isinstance(v, str) else v
     return True if v in NONISH_VALUES else False
+
+
+def is_digit(v: t.Any) -> bool:
+    if isinstance(v, str):
+        v = v.replace(".", "", 1)
+        v = v.replace("-", "", 1) if v.startswith("-") else v
+        return v.isdigit()
+
+    return isinstance(v, int | float)
 
 
 # COERCING/SERIALIZING
@@ -304,3 +314,53 @@ class BooleanConstraints:
 
     def serialize(self, v: bool) -> t.Any:
         return self.serialization[0] if v is True else self.serialization[1]
+
+
+@dataclass
+class DatetimeConstraints:
+    mode: Mode = "python"
+    has_default: bool = False
+
+    def __get_pydantic_core_schema__(
+        self, source_type: t.Any, handler: "GetCoreSchemaHandler"
+    ) -> "CoreSchema":
+        schema = handler(source_type)
+        date_schema = find_type_schema(schema, "date")
+
+        schema = cs.no_info_before_validator_function(
+            (coerce_nonish_to_default if self.has_default else coerce_nonish_to_none),
+            cs.no_info_before_validator_function(
+                self.validate_date if date_schema else self.validate_time,
+                schema,
+                serialization=cs.plain_serializer_function_ser_schema(
+                    self.serialize_date if date_schema else self.serialize_time
+                ),
+            ),
+        )
+
+        return schema
+
+    def validate_date(self, v: t.Any) -> t.Any:
+        if is_digit(v):
+            # FIXME use datetime.timezone.utc? or use local timezone
+            return datetime.date.fromtimestamp(float(v))
+        if isinstance(v, str):
+            if v.find("T") == 10:
+                return v.split("T")[0]
+            if v.find(" ") == 10:
+                return v.split(" ")[0]
+        return v
+
+    def validate_time(self, v: t.Any) -> t.Any:
+        if is_digit(v):
+            value = float(v)
+            if value >= 0:
+                return datetime.datetime.fromtimestamp(float(v)).time()
+
+        return v
+
+    def serialize_date(self, v: datetime.datetime | None) -> str:
+        return "" if v is None else v.isoformat()
+
+    def serialize_time(self, v: datetime.time | None) -> str:
+        return "" if v is None else v.strftime("%H:%M")
