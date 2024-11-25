@@ -1097,32 +1097,23 @@ class TimeOption(BaseInputOption):
     """
 
     type: Literal[OptionType.time] = OptionType.time
-    default: str | int | None = None
-    _annotation = datetime.time
+    default: Annotated[datetime.time | None, DatetimeConstraints()] = None
+
+    def get_annotation(self, mode: Mode = "bash") -> Any:
+        return (
+            Annotated[
+                datetime.time | None if self.optional else datetime.time,
+                DatetimeConstraints(
+                    mode=mode,
+                    has_default=self.default is not None,
+                ),
+            ],
+            Field(**self._get_field_attrs()),
+        )
 
     @staticmethod
-    def _value_pre_validator(
-        cls, v: Any, info: "ValidationInfo"
-    ) -> datetime.time | datetime.datetime | None:
-        v = super(TimeOption, TimeOption)._value_pre_validator(cls, v, info)
-        if isinstance(v, int | float) or (
-            isinstance(v, str) and v.replace(".", "").replace("-", "", 1).isdigit()
-        ):
-            value = float(v)
-            if value >= 0:
-                return datetime.datetime.fromtimestamp(float(v)).time()
-
-        return v
-
-    @staticmethod
-    def _value_post_validator(
-        cls, value: datetime.date | None, info: "ValidationInfo"
-    ) -> str | None:
-        if isinstance(value, datetime.time):
-            # FIXME could use `value.isoformat()` to get `%H:%M:%S`
-            return value.strftime("%H:%M")
-
-        return super(TimeOption, TimeOption)._value_post_validator(cls, value, info)
+    def humanize(v: Any, option={}) -> str:
+        return v.strftime("%H:%M") if v else v
 
 
 # ─ LOCATIONS ─────────────────────────────────────────────
