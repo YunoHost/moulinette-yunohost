@@ -65,6 +65,7 @@ from yunohost.utils.validation import (
     FORBIDDEN_PASSWORD_CHARS,
     BaseConstraints,
     BooleanConstraints,
+    DatetimeConstraints,
     Mode,
     NumberConstraints,
     PasswordConstraints,
@@ -1064,30 +1065,19 @@ class DateOption(BaseInputOption):
     """
 
     type: Literal[OptionType.date] = OptionType.date
-    default: str | None = None
-    _annotation = datetime.date
+    default: Annotated[datetime.date | None, DatetimeConstraints()] = None
 
-    @staticmethod
-    def _value_pre_validator(
-        cls, v: datetime.date | str | None, info: "ValidationInfo"
-    ) -> datetime.date | str | None:
-        v = super(DateOption, DateOption)._value_pre_validator(cls, v, info)
-        if isinstance(v, int | float) or (
-            isinstance(v, str) and v.replace(".", "").replace("-", "", 1).isdigit()
-        ):
-            # FIXME use datetime.timezone.utc? or use local timezone
-            return datetime.date.fromtimestamp(float(v))
-
-        return v
-
-    @staticmethod
-    def _value_post_validator(
-        cls, value: datetime.date | None, info: "ValidationInfo"
-    ) -> str | None:
-        if isinstance(value, datetime.date):
-            return value.isoformat()
-
-        return super(DateOption, DateOption)._value_post_validator(cls, value, info)
+    def get_annotation(self, mode: Mode = "bash") -> Any:
+        return (
+            Annotated[
+                datetime.date | None if self.optional else datetime.date,
+                DatetimeConstraints(
+                    mode=mode,
+                    has_default=self.default is not None,
+                ),
+            ],
+            Field(**self._get_field_attrs()),
+        )
 
 
 class TimeOption(BaseInputOption):
