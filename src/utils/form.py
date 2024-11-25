@@ -1136,7 +1136,18 @@ class EmailOption(BaseInputOption):
 
     type: Literal[OptionType.email] = OptionType.email
     default: EmailStr | None = None
-    _annotation = EmailStr
+
+    def get_annotation(self, mode: Mode = "bash") -> Any:
+        return (
+            Annotated[
+                EmailStr | None if self.optional else EmailStr,
+                BaseConstraints(
+                    mode=mode,
+                    has_default=self.default is not None,
+                ),
+            ],
+            Field(**self._get_field_attrs()),
+        )
 
 
 class WebPathOption(BaseStringOption):
