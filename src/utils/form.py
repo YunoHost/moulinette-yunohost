@@ -64,9 +64,11 @@ from yunohost.utils.error import YunohostError, YunohostValidationError
 from yunohost.utils.i18n import _value_for_locale
 from yunohost.utils.validation import (
     FORBIDDEN_PASSWORD_CHARS,
+    UPLOAD_DIRS,
     BaseConstraints,
     BooleanConstraints,
     DatetimeConstraints,
+    FileConstraints,
     Mode,
     NumberConstraints,
     PasswordConstraints,
@@ -1252,36 +1254,6 @@ class URLOption(BaseInputOption):
 # ─ FILE ──────────────────────────────────────────────────
 
 
-def _base_value_post_validator(
-    cls, value: Any, info: "ValidationInfo"
-) -> tuple[bytes, str | None]:
-    import mimetypes
-    from pathlib import Path
-    from magic import Magic
-    from base64 import b64decode
-
-    if Moulinette.interface.type != "api":
-        path = Path(value)
-        if not (path.exists() and path.is_absolute() and path.is_file()):
-            raise YunohostValidationError("File doesn't exists", raw_msg=True)
-        content = path.read_bytes()
-    else:
-        content = b64decode(value)
-
-    accept_list = cls.model_fields[info.field_name].json_schema_extra.get("accept")
-    mimetype = Magic(mime=True).from_buffer(content)
-
-    if accept_list and mimetype not in accept_list:
-        raise YunohostValidationError(
-            f"Unsupported file type '{mimetype}', expected a type among '{', '.join(accept_list)}'.",
-            raw_msg=True,
-        )
-
-    ext = mimetypes.guess_extension(mimetype)
-
-    return content, ext
-
-
 class FileOption(BaseInputOption):
     r"""
     Ask for file.
@@ -1303,92 +1275,29 @@ class FileOption(BaseInputOption):
     """
 
     type: Literal[OptionType.file] = OptionType.file
-    # `FilePath` for CLI (path must exists and must be a file)
-    # `bytes` for API (a base64 encoded file actually)
     accept: list[str] | None = None  # currently only used by the web-admin
     default: str | None = None
-    _annotation = str  # TODO could be Path at some point
-    _upload_dirs: ClassVar[set[str]] = set()
 
-    @property
-    def _validators(self) -> dict[str, Callable]:
-        return {
-            "pre": self._value_pre_validator,
-            "post": (
-                self._bash_value_post_validator
-                if self.mode == "bash"
-                else self._python_value_post_validator
-            ),
-        }
-
-    def _get_field_attrs(self) -> dict[str, Any]:
-        attrs = super()._get_field_attrs()
-
-        if self.accept:
-            attrs["json_schema_extra"]["accept"] = self.accept  # extra
-
-        attrs["json_schema_extra"]["bind"] = self.bind
-
-        return attrs
+    def get_annotation(self, mode: Mode = "bash") -> Any:
+        return (
+            Annotated[
+                str | None if self.optional else str,
+                FileConstraints(
+                    mode=mode,
+                    has_default=self.default is not None,
+                    bind=self.bind,
+                    accept=self.accept,
+                ),
+            ],
+            Field(**self._get_field_attrs()),
+        )
 
     @classmethod
     def clean_upload_dirs(cls) -> None:
         # Delete files uploaded from API
-        for upload_dir in cls._upload_dirs:
+        for upload_dir in UPLOAD_DIRS:
             if os.path.exists(upload_dir):
                 shutil.rmtree(upload_dir)
-
-    @staticmethod
-    def _bash_value_post_validator(cls, value: Any, info: "ValidationInfo") -> str:
-        """File handling for "bash" config panels (app)"""
-        if not value:
-            return ""
-
-        content, _ = _base_value_post_validator(cls, value, info)
-
-        upload_dir = tempfile.mkdtemp(prefix="ynh_filequestion_")
-        _, file_path = tempfile.mkstemp(dir=upload_dir)
-
-        FileOption._upload_dirs.add(upload_dir)
-
-        logger.debug(
-            f"Saving file {info.field_name} for file question into {file_path}"
-        )
-
-        write_to_file(file_path, content, file_mode="wb")
-
-        return file_path
-
-    @staticmethod
-    def _python_value_post_validator(cls, value: Any, info: "ValidationInfo") -> str:
-        """File handling for "python" config panels"""
-
-        from pathlib import Path
-        import hashlib
-
-        if not value:
-            return ""
-
-        bind = cls.model_fields[info.field_name].json_schema_extra["bind"]
-
-        # to avoid "filename too long" with b64 content
-        if len(value.encode("utf-8")) < 255:
-            # Check if value is an already hashed and saved filepath
-            path = Path(value)
-            if path.exists() and value == bind.format(
-                filename=path.stem, ext=path.suffix
-            ):
-                return value
-
-        content, ext = _base_value_post_validator(cls, value, info)
-
-        m = hashlib.sha256()
-        m.update(content)
-        sha256sum = m.hexdigest()
-        filename = Path(bind.format(filename=sha256sum, ext=ext))
-        filename.write_bytes(content)
-
-        return str(filename)
 
 
 # ─ CHOICES ───────────────────────────────────────────────
