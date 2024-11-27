@@ -2,13 +2,18 @@ import datetime
 import typing as t
 import urllib
 from dataclasses import dataclass
-from pydantic import ValidationError
+from pathlib import Path
+from pydantic import AnyUrl, ValidationError
 from pydantic_core import PydanticCustomError, PydanticUseDefault, core_schema as cs
 
 from yunohost.log import OperationLogger
 
 if t.TYPE_CHECKING:
-    from pydantic import GetCoreSchemaHandler, SerializerFunctionWrapHandler
+    from pydantic import (
+        GetCoreSchemaHandler,
+        SerializerFunctionWrapHandler,
+        ValidatorFunctionWrapHandler,
+    )
     from pydantic_core import CoreSchema
 
 
@@ -364,3 +369,47 @@ class DatetimeConstraints:
 
     def serialize_time(self, v: datetime.time | None) -> str:
         return "" if v is None else v.strftime("%H:%M")
+
+
+@dataclass
+class PathConstraints:
+    mode: Mode = "python"
+    has_default: bool = False
+    type: t.Literal["webpath"] = "webpath"
+
+    def __get_pydantic_core_schema__(
+        self, source_type: t.Any, handler: "GetCoreSchemaHandler"
+    ) -> "CoreSchema":
+        schema = handler(source_type)
+        schema = cs.no_info_before_validator_function(
+            (coerce_nonish_to_default if self.has_default else coerce_nonish_to_none),
+            cs.no_info_wrap_validator_function(
+                self.validate,
+                schema,
+                serialization=cs.plain_serializer_function_ser_schema(self.serialize),
+            ),
+        )
+
+        return schema
+
+    def validate(
+        self, v: Path | str | None, handler: "ValidatorFunctionWrapHandler"
+    ) -> Path | None:
+        if isinstance(v, str):
+            if "://" in v:
+                v = Path(t.cast(str, AnyUrl(v).path).strip("/"))
+            else:
+                v = v.strip().strip("./")
+
+        path: Path | None = handler(v)
+
+        if path is None:
+            return None
+
+        if not path.is_absolute() and str("/" / path).find("../") < 0:
+            path = "/" / path
+
+        return path
+
+    def serialize(self, v: Path | None) -> str:
+        return "" if v is None else str(v)
