@@ -2,10 +2,12 @@ import datetime
 import typing as t
 import urllib
 from dataclasses import dataclass
+from logging import getLogger
 from pathlib import Path
 from pydantic import AnyUrl, ValidationError
 from pydantic_core import PydanticCustomError, PydanticUseDefault, core_schema as cs
 
+from moulinette import Moulinette
 from yunohost.log import OperationLogger
 
 if t.TYPE_CHECKING:
@@ -13,9 +15,12 @@ if t.TYPE_CHECKING:
         GetCoreSchemaHandler,
         SerializerFunctionWrapHandler,
         ValidatorFunctionWrapHandler,
+        ValidationInfo,
     )
     from pydantic_core import CoreSchema
 
+
+logger = getLogger("yunohost.validation")
 
 Mode = t.Literal["python", "bash"]
 Translation = dict[str, str] | str
@@ -413,3 +418,105 @@ class PathConstraints:
 
     def serialize(self, v: Path | None) -> str:
         return "" if v is None else str(v)
+
+
+UPLOAD_DIRS = set()
+
+
+@dataclass
+class FileConstraints:
+    mode: Mode = "python"
+    has_default: bool = False
+    bind: str | None = None
+    accept: list[str] | None = None
+
+    def __get_pydantic_core_schema__(
+        self, source_type: t.Any, handler: "GetCoreSchemaHandler"
+    ) -> "CoreSchema":
+        schema = handler(source_type)
+        type_schema = find_type_schema(schema, "str")
+        type_schema.update(
+            cs.with_info_after_validator_function(
+                self.file_python if self.mode == "python" else self.file_bash,
+                cs.str_schema(),
+            )
+        )
+        schema = cs.no_info_before_validator_function(
+            (coerce_nonish_to_default if self.has_default else coerce_nonish_to_none),
+            schema,
+            serialization=cs.plain_serializer_function_ser_schema(
+                serialize_none_to_empty_str,
+            ),
+        )
+
+        return schema
+
+    def _base_parse_file(self, v: str) -> tuple[bytes, str | None]:
+        import mimetypes
+        from magic import Magic
+        from base64 import b64decode
+
+        if Moulinette.interface.type != "api":  # isinstance(v, Path):
+            path = Path(v)
+            if not (path.exists() and path.is_absolute() and path.is_file()):
+                # FIXME, search pydantic eq error i18n key
+                raise PydanticCustomError("file_not_exists", "File doesn't exists")
+            content = path.read_bytes()
+        else:
+            content = b64decode(v)
+
+        mimetype = Magic(mime=True).from_buffer(content)
+
+        if self.accept and mimetype not in self.accept:
+            raise PydanticCustomError(
+                "file_unsupported_type",
+                "Unsupported file type '{mimetype}', expected a type among '{accept_list}'.",
+                {"mimetype": mimetype, "accept_list": ", ".join(self.accept)},
+            )
+
+        ext = mimetypes.guess_extension(mimetype)
+
+        return content, ext
+
+    def file_bash(self, v: str, info: "ValidationInfo") -> str:
+        """File handling for "bash" config panels (app)"""
+        import tempfile
+
+        content, _ = self._base_parse_file(v)
+
+        upload_dir = tempfile.mkdtemp(prefix="ynh_filequestion_")
+        _, file_path = tempfile.mkstemp(dir=upload_dir)
+
+        UPLOAD_DIRS.add(upload_dir)
+
+        logger.debug(
+            f"Saving file {info.field_name} for file question into {file_path}"
+        )
+        Path(file_path).write_bytes(content)
+
+        return file_path
+
+    def file_python(self, v: str, info: "ValidationInfo") -> str:
+        """File handling for "python" config panels"""
+        import hashlib
+
+        assert self.bind is not None, f"File 'bind' is required for {info.field_name}."
+
+        # to avoid "filename too long" with b64 content
+        if len(v.encode("utf-8")) < 255:
+            # Check if value is an already hashed and saved filepath
+            path = Path(v)
+            if path.exists() and v == self.bind.format(
+                filename=path.stem, ext=path.suffix
+            ):
+                return v
+
+        content, ext = self._base_parse_file(v)
+
+        m = hashlib.sha256()
+        m.update(content)
+        sha256sum = m.hexdigest()
+        file = Path(self.bind.format(filename=sha256sum, ext=ext))
+        file.write_bytes(content)
+
+        return str(file)
