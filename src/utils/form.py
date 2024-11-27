@@ -1216,7 +1216,7 @@ class WebPathOption(BaseInputOption):
         )
 
 
-class URLOption(BaseStringOption):
+class URLOption(BaseInputOption):
     """
     Ask for any url.
 
@@ -1233,16 +1233,20 @@ class URLOption(BaseStringOption):
     """
 
     type: Literal[OptionType.url] = OptionType.url
-    _annotation = HttpUrl
+    default: Annotated[HttpUrl | None, BaseConstraints()] = None
 
-    @staticmethod
-    def _value_post_validator(
-        cls, value: HttpUrl | None, info: "ValidationInfo"
-    ) -> str | None:
-        if isinstance(value, Url):
-            return str(value)
-
-        return super(URLOption, URLOption)._value_post_validator(cls, value, info)
+    def get_annotation(self, mode: Mode = "bash") -> Any:
+        return (
+            Annotated[
+                HttpUrl | None if self.optional else HttpUrl,
+                BaseConstraints(
+                    mode=mode,
+                    has_default=self.default is not None,
+                    serializer=lambda v: str(v) if v else v,
+                ),
+            ],
+            Field(**self._get_field_attrs()),
+        )
 
 
 # ─ FILE ──────────────────────────────────────────────────

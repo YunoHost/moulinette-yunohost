@@ -1133,7 +1133,7 @@ class TestUrl(BaseTest):
     raw_option = {"type": "url", "id": "url_id"}
     prefill = {
         "raw_option": {"default": "https://domain.tld"},
-        "prefill": "https://domain.tld",
+        "prefill": "https://domain.tld/",
     }
     # fmt: off
     scenarios = [
@@ -1144,7 +1144,7 @@ class TestUrl(BaseTest):
         ("http://some.org/folder/file.txt", "http://some.org/folder/file.txt"),
         ('  https://www.example.com \n', 'https://www.example.com/'),
         # readonly
-        ("https://overwrite.org", "https://example.org", {"readonly": True, "default": "https://example.org"}),
+        ("https://overwrite.org", "https://example.org/", {"readonly": True, "default": "https://example.org"}),
         # rest is taken from https://github.com/pydantic/pydantic/blob/main/tests/test_networks.py
         # valid
         *unchanged(
