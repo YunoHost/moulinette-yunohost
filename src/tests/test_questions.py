@@ -1086,7 +1086,7 @@ class TestWebPath(BaseTest):
     raw_option = {"type": "path", "id": "path_id"}
     prefill = {
         "raw_option": {"default": "some_path"},
-        "prefill": "some_path",
+        "prefill": "/some_path",
     }
     # fmt: off
     scenarios = [
@@ -1106,20 +1106,17 @@ class TestWebPath(BaseTest):
         *xpass(scenarios=[
             ("value\nvalue", "/value\nvalue"),
             ("value value", "/value value"),
-            ("value//value", "/value//value"),
+            ("value//value", "/value/value"),
         ], reason="Should fail"),
         *xpass(scenarios=[
-            ("./here", "/./here"),
-            ("../here", "/../here"),
-            ("/somewhere/../here", "/somewhere/../here"),
+            ("./here", "/here"),
+            ("../here", "/here"),
+            ("/somewhere/../here", "somewhere/../here"),
         ], reason="Should fail or flattened"),
-
         *xpass(scenarios=[
             ("/one?withquery=ah", "/one?withquery=ah"),
-        ], reason="Should fail or query string removed"),
-        *xpass(scenarios=[
-            ("https://example.com/folder", "/https://example.com/folder")
-        ], reason="Should fail or scheme+domain removed"),
+        ], reason="Should fail or query string removed?"),
+        ("https://example.com/folder", "/folder"),
         # readonly
         ("/overwrite", "/value", {"readonly": True, "default": "/value"}),
         # FIXME should path have forbidden_chars?

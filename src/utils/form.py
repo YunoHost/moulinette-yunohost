@@ -26,6 +26,7 @@ import tempfile
 import urllib.parse
 from enum import Enum
 from logging import getLogger
+from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     cast,
@@ -69,6 +70,7 @@ from yunohost.utils.validation import (
     Mode,
     NumberConstraints,
     PasswordConstraints,
+    PathConstraints,
     Pattern,
     StringConstraints,
     Translation,
@@ -1150,7 +1152,7 @@ class EmailOption(BaseInputOption):
         )
 
 
-class WebPathOption(BaseStringOption):
+class WebPathOption(BaseInputOption):
     """
     Ask for an web path (the part of an url after the domain). Used by default in app install to define from where the app will be accessible.
 
@@ -1167,6 +1169,7 @@ class WebPathOption(BaseStringOption):
     """
 
     type: Literal[OptionType.path] = OptionType.path
+    default: Annotated[Path | None, PathConstraints()] = None
 
     @staticmethod
     def normalize(value, option={}) -> str:
@@ -1175,27 +1178,42 @@ class WebPathOption(BaseStringOption):
         if value is None:
             value = ""
 
-        if not isinstance(value, str):
+        if not isinstance(value, Path | str):
             raise YunohostValidationError(
                 "app_argument_invalid",
                 name=option.get("id"),
                 error="Argument for path should be a string.",
             )
 
-        if not value.strip():
-            if option.get("optional"):
-                return ""
-            # Hmpf here we could just have a "else" case
-            # but we also want WebPathOption.normalize("") to return "/"
-            # (i.e. if no option is provided, hence .get("optional") is None
-            elif option.get("optional") is False:
-                raise YunohostValidationError(
-                    "app_argument_invalid",
-                    name=option.get("id"),
-                    error="Option is mandatory",
-                )
+        if isinstance(value, str):
+            if not value.strip():
+                if option.get("optional"):
+                    return ""
+                # Hmpf here we could just have a "else" case
+                # but we also want WebPathOption.normalize("") to return "/"
+                # (i.e. if no option is provided, hence .get("optional") is None
+                elif option.get("optional") is False:
+                    raise YunohostValidationError(
+                        "app_argument_invalid",
+                        name=option.get("id"),
+                        error="Option is mandatory",
+                    )
 
-        return "/" + value.strip().strip(" /")
+            return "/" + value.strip().strip(" /")
+
+        return str(value)
+
+    def get_annotation(self, mode: Mode = "bash") -> Any:
+        return (
+            Annotated[
+                Path | None if self.optional else Path,
+                PathConstraints(
+                    mode=mode,
+                    has_default=self.default is not None,
+                ),
+            ],
+            Field(**self._get_field_attrs()),
+        )
 
 
 class URLOption(BaseStringOption):
