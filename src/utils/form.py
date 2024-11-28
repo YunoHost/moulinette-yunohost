@@ -1571,7 +1571,7 @@ class AppOption(BaseSelectOption):
         return values
 
 
-class UserOption(BaseChoicesOption):
+class UserOption(BaseSelectOption):
     """
     Ask for a user.
     Renders as a select in the web-admin and as a regular prompt in CLI with autocompletion of available usernames.
@@ -1587,8 +1587,7 @@ class UserOption(BaseChoicesOption):
     """
 
     type: Literal[OptionType.user] = OptionType.user
-    filter: Literal[None] = None
-    choices: dict[str, str] | None = None
+    choices: dict[str, str]
 
     @model_validator(mode="before")
     def inject_users_choices_and_default(cls, values: Values) -> Values:
