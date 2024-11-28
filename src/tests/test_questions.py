@@ -1486,8 +1486,8 @@ class TestTags(BaseTest):
         ("three", FAIL, {"choices": ["one", "two"]}),
         *unchanged("none", "_none", "False", "True", "0", "1", "-1", "1337", "13.37", "[]", "['one']", "one,two", r"{}", "value"),
         (" value\n", "value"),
-        ([False, True, -1, 0, 1, 1337, 13.37, [], ["one"], {}], "False,True,-1,0,1,1337,13.37,[],['one'],{}"),
-        *(([t], str(t)) for t in (False, True, -1, 0, 1, 1337, 13.37, [], ["one"], {})),
+        ([False, True, -1, 0, 1, 1337, 13.37, [], ["one"], {}], FAIL),
+        *all_fails(([t], str(t)) for t in (False, True, -1, 0, 1, 1337, 13.37, [], ["one"], {})),
         # basic types (not in a list) should fail
         *all_fails(True, False, -1, 0, 1, 1337, 13.37, {}),
         # Mixed choices should fail

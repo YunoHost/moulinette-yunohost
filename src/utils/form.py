@@ -80,6 +80,7 @@ from yunohost.utils.validation import (
     coerce_comalist_to_list,
     coerce_nonish_to_none,
     redact,
+    serialize_list_to_comalist,
 )
 
 if TYPE_CHECKING:
@@ -1421,12 +1422,14 @@ class TagsOption(BaseChoicesOption):
     """
 
     type: Literal[OptionType.tags] = OptionType.tags
-    filter: Literal[None] = None
-    choices: list[str] | None = None
+    choices: Annotated[
+        list[str] | None, BeforeValidator(coerce_comalist_to_list), BaseConstraints()
+    ] = None
     pattern: Pattern | None = None
     icon: str | None = None
-    default: str | list[str] | None = None
-    _annotation = str
+    default: Annotated[
+        list[str] | None, BeforeValidator(coerce_comalist_to_list), BaseConstraints()
+    ] = None
 
     @staticmethod
     def humanize(value, option={}) -> str:
@@ -1446,57 +1449,20 @@ class TagsOption(BaseChoicesOption):
             return ""
         return value
 
-    @property
-    def _dynamic_annotation(self) -> Type[str]:
-        # TODO use Literal when serialization is seperated from validation
-        # if self.choices is not None:
-        #     return Literal[tuple(self.choices)]
-
-        # Repeat pattern stuff since we can't call the bare class `_dynamic_annotation` prop without instantiating it
-        if self.pattern:
-            return constr(pattern=self.pattern.regexp)
-
-        return self._annotation
-
-    def _get_field_attrs(self) -> dict[str, Any]:
-        attrs = super()._get_field_attrs()
-
-        if self.choices:
-            attrs["json_schema_extra"]["choices"] = self.choices  # extra
-
-        return attrs
-
-    @staticmethod
-    def _value_pre_validator(
-        cls, value: list | str | None, info: "ValidationInfo"
-    ) -> str | None:
-        if value is None or value == "":
-            return None
-
-        if not isinstance(value, (list, str, type(None))):
-            raise YunohostValidationError(
-                "app_argument_invalid",
-                name=info.field_name,
-                error=f"'{str(value)}' is not a list",
-            )
-
-        if isinstance(value, str):
-            value = [v.strip() for v in value.split(",")]
-            value = [v for v in value if v]
-
-        if isinstance(value, list):
-            choices = cls.model_fields[info.field_name].json_schema_extra.get("choices")
-            if choices:
-                if not all(v in choices for v in value):
-                    raise YunohostValidationError(
-                        "app_argument_choice_invalid",
-                        name=info.field_name,
-                        value=value,
-                        choices=", ".join(str(choice) for choice in choices),
-                    )
-
-            return ",".join(str(v) for v in value)
-        return value
+    def get_annotation(self, mode: Mode = "bash") -> Any:
+        base: Any = Literal[tuple(self.choices)] if self.choices else str
+        return (
+            Annotated[
+                list[base] | None if self.optional else list[base],
+                BeforeValidator(coerce_comalist_to_list),
+                BaseConstraints(
+                    mode=mode,
+                    has_default=self.default is not None,
+                    serializer=serialize_list_to_comalist,
+                ),
+            ],
+            Field(**self._get_field_attrs()),
+        )
 
 
 # ─ ENTITIES ──────────────────────────────────────────────

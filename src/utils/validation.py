@@ -65,7 +65,7 @@ def coerce_comalist_to_list(v: t.Any) -> t.Any:
     if isinstance(v, str):
         values = [value.strip() for value in v.split(",")]
         v = [value for value in values if value]
-    
+
     if isinstance(v, list) and len(v) < 1:
         return None
 
@@ -74,6 +74,10 @@ def coerce_comalist_to_list(v: t.Any) -> t.Any:
 
 def serialize_none_to_empty_str(v: t.Any) -> t.Any:
     return "" if v is None else v
+
+
+def serialize_list_to_comalist(v: list[t.Any]) -> str:
+    return ",".join(v) if isinstance(v, list) else v
 
 
 # VALIDATORS
