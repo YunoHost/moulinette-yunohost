@@ -1619,7 +1619,7 @@ class UserOption(BaseSelectOption):
         return values
 
 
-class GroupOption(BaseChoicesOption):
+class GroupOption(BaseSelectOption):
     """
     Ask for a group.
     Renders as a select in the web-admin and as a regular prompt in CLI with autocompletion of available groups.
@@ -1636,8 +1636,7 @@ class GroupOption(BaseChoicesOption):
     """
 
     type: Literal[OptionType.group] = OptionType.group
-    filter: Literal[None] = None
-    choices: dict[str, str] | None = None
+    choices: dict[str, str]
     default: Literal["visitors", "all_users", "admins"] | None = "all_users"
 
     @model_validator(mode="before")
