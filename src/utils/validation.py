@@ -61,6 +61,17 @@ def coerce_nonish_to_none(v: t.Any) -> t.Any:
     return None if is_nonish(v) else v
 
 
+def coerce_comalist_to_list(v: t.Any) -> t.Any:
+    if isinstance(v, str):
+        values = [value.strip() for value in v.split(",")]
+        v = [value for value in values if value]
+    
+    if isinstance(v, list) and len(v) < 1:
+        return None
+
+    return v
+
+
 def serialize_none_to_empty_str(v: t.Any) -> t.Any:
     return "" if v is None else v
 

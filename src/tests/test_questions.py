@@ -1440,14 +1440,15 @@ class TestSelect(BaseTest):
             ]
         },
         {
-            "raw_options": [{"choices": ""}, {"choices": []}],
+            "raw_options": [
+                {"choices": ""}, 
+                {"choices": []}, 
+                {"choices": "", "optional": True}, 
+                {"choices": [], "optional": True},
+            ],
             "scenarios": [
-                # FIXME those should fail at option level (wrong default, dev error)
                 *all_fails(None, "", error=YunohostError),
-                *xpass(scenarios=[
-                    ("", "", {"optional": True}),
-                    (None, "", {"optional": True}),
-                ], reason="empty choices, should fail at option instantiation"),
+                *all_fails("", None, raw_option={"optional": True}, error=YunohostError),
             ]
         },
         # readonly
