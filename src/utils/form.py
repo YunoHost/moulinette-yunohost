@@ -1468,7 +1468,7 @@ class TagsOption(BaseChoicesOption):
 # ─ ENTITIES ──────────────────────────────────────────────
 
 
-class DomainOption(BaseChoicesOption):
+class DomainOption(BaseSelectOption):
     """
     Ask for a user domain.
     Renders as a select in the web-admin and as a regular prompt in CLI with autocompletion of registered domains.
@@ -1484,8 +1484,7 @@ class DomainOption(BaseChoicesOption):
     """
 
     type: Literal[OptionType.domain] = OptionType.domain
-    filter: Literal[None] = None
-    choices: dict[str, str] | None = None
+    choices: dict[str, str]
 
     @model_validator(mode="before")
     @classmethod
