@@ -70,6 +70,7 @@ from yunohost.utils.validation import (
     BooleanConstraints,
     DatetimeConstraints,
     FileConstraints,
+    ListConstraints,
     Mode,
     NumberConstraints,
     PasswordConstraints,
@@ -641,7 +642,7 @@ class BaseInputOption(BaseOption):
     redact: bool = False
     optional: bool = False  # FIXME keep required as default?
     default: Any = None
-    _none_as_empty_str: ClassVar[bool] = True
+    multiple: bool = False
 
     @field_validator("default", mode="before")
     @classmethod
@@ -687,6 +688,28 @@ class BaseInputOption(BaseOption):
             attrs["default"] = ...
 
         return attrs
+
+    def _build_annotation(
+        self,
+        type_: Any,
+        *validators: Any,
+        mode: Mode = "python",
+    ) -> tuple[Any, "FieldInfo"]:
+        field = Field(**self._get_field_attrs())
+        anno: Any = Annotated[
+            type_ | None if not self.multiple and self.optional else type_,
+            *validators,
+        ]
+
+        if self.multiple:
+            anno = Annotated[
+                list[anno] | None if self.optional else list[anno],
+                (ListConstraints(mode=mode, has_default=self.default is not None)),
+                # FIXME use in constraints in serializer
+                AfterValidator(redact) if self.redact else None,
+            ]
+
+        return (anno, field)
 
     def get_annotation(self, mode: Mode = "python") -> tuple[Any, "FieldInfo"]:
         raise NotImplementedError()
@@ -786,6 +809,7 @@ class PasswordOption(BaseInputOption):
     example: Literal[None] = None
     default: Literal[None] = None
     redact: Literal[True] = True
+    multiple: Literal[False] = False
     _forbidden_chars: ClassVar[str] = FORBIDDEN_PASSWORD_CHARS
 
     def get_annotation(self, mode: Mode = "bash") -> tuple[Any, "FieldInfo"]:
@@ -1430,6 +1454,7 @@ class TagsOption(BaseChoicesOption):
     default: Annotated[
         list[str] | None, BeforeValidator(coerce_comalist_to_list), BaseConstraints()
     ] = None
+    multiple: Literal[True] = True
 
     @staticmethod
     def humanize(value, option={}) -> str:
