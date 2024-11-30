@@ -1973,8 +1973,8 @@ def prompt_or_validate_form(
                 value = option.default
 
             try:
-                # Normalize and validate
-                form[option.id] = option.normalize(value, option)
+                # Validate
+                form[option.id] = value
                 context[option.id] = form[option.id]
                 # In case of boolean option, yes/no may be custom, set a true boolean as context
                 if isinstance(option, BooleanOption) and form[option.id] is not None:
