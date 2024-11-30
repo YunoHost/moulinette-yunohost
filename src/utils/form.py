@@ -731,18 +731,15 @@ class BaseStringOption(BaseInputOption):
     default: str | None = None
     pattern: Pattern | None = None
 
-    def get_annotation(self, mode: Mode = "bash") -> tuple[Any, "FieldInfo"]:
-        return (
-            Annotated[
-                str | None if self.optional else str,
-                StringConstraints(
-                    mode=mode,
-                    has_default=self.default is not None,
-                    pattern=self.pattern,
-                ),
-                AfterValidator(redact) if self.redact else None,
-            ],
-            Field(**self._get_field_attrs()),
+    def get_annotation(self, mode: Mode = "python") -> tuple[Any, "FieldInfo"]:
+        return self._build_annotation(
+            str,
+            StringConstraints(
+                mode=mode,
+                has_default=self.default is not None and not self.multiple,
+                pattern=self.pattern,
+            ),
+            mode=mode,
         )
 
 
@@ -812,16 +809,14 @@ class PasswordOption(BaseInputOption):
     multiple: Literal[False] = False
     _forbidden_chars: ClassVar[str] = FORBIDDEN_PASSWORD_CHARS
 
-    def get_annotation(self, mode: Mode = "bash") -> tuple[Any, "FieldInfo"]:
-        return (
-            Annotated[
-                str | None if self.optional else str,
-                PasswordConstraints(
-                    mode=mode,
-                    forbidden_chars=self._forbidden_chars,
-                ),
-            ],
-            Field(**self._get_field_attrs()),
+    def get_annotation(self, mode: Mode = "python") -> tuple[Any, "FieldInfo"]:
+        return self._build_annotation(
+            str,
+            PasswordConstraints(
+                mode=mode,
+                forbidden_chars=self._forbidden_chars,
+            ),
+            mode=mode,
         )
 
 
@@ -858,16 +853,14 @@ class ColorOption(BaseInputOption):
 
         return super(ColorOption, ColorOption).normalize(value, option)
 
-    def get_annotation(self, mode: Mode = "bash") -> Any:
-        return (
-            Annotated[
-                Color | None if self.optional else Color,
-                PlainSerializer(lambda v: v.as_hex() if v else v),
-                BaseConstraints(
-                    mode=mode, has_default=self.default is not None, redact=self.redact
-                ),
-            ],
-            Field(**self._get_field_attrs()),
+    def get_annotation(self, mode: Mode = "python") -> tuple[Any, "FieldInfo"]:
+        return self._build_annotation(
+            Color,
+            PlainSerializer(lambda v: v.as_hex() if v else v),
+            BaseConstraints(
+                mode=mode, has_default=self.default is not None, redact=self.redact
+            ),
+            mode=mode,
         )
 
 
@@ -923,19 +916,17 @@ class NumberOption(BaseInputOption):
             error=m18n.n("invalid_number"),
         )
 
-    def get_annotation(self, mode: Mode = "bash") -> Any:
-        return (
-            Annotated[
-                int | None if self.optional else int,
-                NumberConstraints(
-                    mode=mode,
-                    has_default=self.default is not None,
-                    min=self.min,
-                    max=self.max,
-                    step=self.step,
-                ),
-            ],
-            Field(**self._get_field_attrs()),
+    def get_annotation(self, mode: Mode = "python") -> tuple[Any, "FieldInfo"]:
+        return self._build_annotation(
+            int,
+            NumberConstraints(
+                mode=mode,
+                has_default=self.default is not None,
+                min=self.min,
+                max=self.max,
+                step=self.step,
+            ),
+            mode=mode,
         )
 
 
@@ -1052,17 +1043,15 @@ class BooleanOption(BaseInputOption):
             choices="yes/no",
         )
 
-    def get_annotation(self, mode: Mode = "bash") -> Any:
-        return (
-            Annotated[
-                bool | None if self.optional else bool,
-                BooleanConstraints(
-                    mode=mode,
-                    has_default=self.default is not None,
-                    serialization=(self.yes, self.no),
-                ),
-            ],
-            Field(**self._get_field_attrs()),
+    def get_annotation(self, mode: Mode = "python") -> tuple[Any, "FieldInfo"]:
+        return self._build_annotation(
+            bool,
+            BooleanConstraints(
+                mode=mode,
+                has_default=self.default is not None,
+                serialization=(self.yes, self.no),
+            ),
+            mode=mode,
         )
 
     def _get_prompt_message(self, value: bool | None) -> str:
@@ -1098,16 +1087,14 @@ class DateOption(BaseInputOption):
     type: Literal[OptionType.date] = OptionType.date
     default: Annotated[datetime.date | None, DatetimeConstraints()] = None
 
-    def get_annotation(self, mode: Mode = "bash") -> Any:
-        return (
-            Annotated[
-                datetime.date | None if self.optional else datetime.date,
-                DatetimeConstraints(
-                    mode=mode,
-                    has_default=self.default is not None,
-                ),
-            ],
-            Field(**self._get_field_attrs()),
+    def get_annotation(self, mode: Mode = "python") -> tuple[Any, "FieldInfo"]:
+        return self._build_annotation(
+            datetime.date,
+            DatetimeConstraints(
+                mode=mode,
+                has_default=self.default is not None,
+            ),
+            mode=mode,
         )
 
 
@@ -1130,21 +1117,19 @@ class TimeOption(BaseInputOption):
     type: Literal[OptionType.time] = OptionType.time
     default: Annotated[datetime.time | None, DatetimeConstraints()] = None
 
-    def get_annotation(self, mode: Mode = "bash") -> Any:
-        return (
-            Annotated[
-                datetime.time | None if self.optional else datetime.time,
-                DatetimeConstraints(
-                    mode=mode,
-                    has_default=self.default is not None,
-                ),
-            ],
-            Field(**self._get_field_attrs()),
-        )
-
     @staticmethod
     def humanize(v: Any, option={}) -> str:
         return v.strftime("%H:%M") if v else v
+
+    def get_annotation(self, mode: Mode = "python") -> tuple[Any, "FieldInfo"]:
+        return self._build_annotation(
+            datetime.time,
+            DatetimeConstraints(
+                mode=mode,
+                has_default=self.default is not None,
+            ),
+            mode=mode,
+        )
 
 
 # ─ LOCATIONS ─────────────────────────────────────────────
@@ -1168,16 +1153,14 @@ class EmailOption(BaseInputOption):
     type: Literal[OptionType.email] = OptionType.email
     default: EmailStr | None = None
 
-    def get_annotation(self, mode: Mode = "bash") -> Any:
-        return (
-            Annotated[
-                EmailStr | None if self.optional else EmailStr,
-                BaseConstraints(
-                    mode=mode,
-                    has_default=self.default is not None,
-                ),
-            ],
-            Field(**self._get_field_attrs()),
+    def get_annotation(self, mode: Mode = "python") -> tuple[Any, "FieldInfo"]:
+        return self._build_annotation(
+            EmailStr,
+            BaseConstraints(
+                mode=mode,
+                has_default=self.default is not None,
+            ),
+            mode=mode,
         )
 
 
@@ -1232,16 +1215,14 @@ class WebPathOption(BaseInputOption):
 
         return str(value)
 
-    def get_annotation(self, mode: Mode = "bash") -> Any:
-        return (
-            Annotated[
-                Path | None if self.optional else Path,
-                PathConstraints(
-                    mode=mode,
-                    has_default=self.default is not None,
-                ),
-            ],
-            Field(**self._get_field_attrs()),
+    def get_annotation(self, mode: Mode = "python") -> tuple[Any, "FieldInfo"]:
+        return self._build_annotation(
+            Path,
+            PathConstraints(
+                mode=mode,
+                has_default=self.default is not None,
+            ),
+            mode=mode,
         )
 
 
@@ -1264,17 +1245,15 @@ class URLOption(BaseInputOption):
     type: Literal[OptionType.url] = OptionType.url
     default: Annotated[HttpUrl | None, BaseConstraints()] = None
 
-    def get_annotation(self, mode: Mode = "bash") -> Any:
-        return (
-            Annotated[
-                HttpUrl | None if self.optional else HttpUrl,
-                BaseConstraints(
-                    mode=mode,
-                    has_default=self.default is not None,
-                    serializer=lambda v: str(v) if v else v,
-                ),
-            ],
-            Field(**self._get_field_attrs()),
+    def get_annotation(self, mode: Mode = "python") -> tuple[Any, "FieldInfo"]:
+        return self._build_annotation(
+            HttpUrl,
+            BaseConstraints(
+                mode=mode,
+                has_default=self.default is not None,
+                serializer=lambda v: str(v) if v else v,
+            ),
+            mode=mode,
         )
 
 
@@ -1305,18 +1284,16 @@ class FileOption(BaseInputOption):
     accept: list[str] | None = None  # currently only used by the web-admin
     default: str | None = None
 
-    def get_annotation(self, mode: Mode = "bash") -> Any:
-        return (
-            Annotated[
-                str | None if self.optional else str,
-                FileConstraints(
-                    mode=mode,
-                    has_default=self.default is not None,
-                    bind=self.bind,
-                    accept=self.accept,
-                ),
-            ],
-            Field(**self._get_field_attrs()),
+    def get_annotation(self, mode: Mode = "python") -> tuple[Any, "FieldInfo"]:
+        return self._build_annotation(
+            str,
+            FileConstraints(
+                mode=mode,
+                has_default=self.default is not None,
+                bind=self.bind,
+                accept=self.accept,
+            ),
+            mode=mode,
         )
 
     @classmethod
@@ -1369,23 +1346,17 @@ class BaseSelectOption(BaseChoicesOption):
     default: str | None = None
     choices: dict[Any, Any] | list[Any]
 
-    def get_annotation(self, mode: Mode = "bash") -> Any:
+    def get_annotation(self, mode: Mode = "python") -> tuple[Any, "FieldInfo"]:
         choices = tuple(
             self.choices if isinstance(self.choices, list) else self.choices.keys()
         )
-        return (
-            Annotated[
-                (
-                    Literal[tuple(choices)] | None
-                    if self.optional
-                    else Literal[tuple(choices)]
-                ),
-                BaseConstraints(
-                    mode=mode,
-                    has_default=self.default is not None,
-                ),
-            ],
-            Field(**self._get_field_attrs()),
+        return self._build_annotation(
+            Literal[tuple(choices)],
+            BaseConstraints(
+                mode=mode,
+                has_default=self.default is not None,
+            ),
+            mode=mode,
         )
 
 
@@ -1474,19 +1445,11 @@ class TagsOption(BaseChoicesOption):
             return ""
         return value
 
-    def get_annotation(self, mode: Mode = "bash") -> Any:
-        base: Any = Literal[tuple(self.choices)] if self.choices else str
-        return (
-            Annotated[
-                list[base] | None if self.optional else list[base],
-                BeforeValidator(coerce_comalist_to_list),
-                BaseConstraints(
-                    mode=mode,
-                    has_default=self.default is not None,
-                    serializer=serialize_list_to_comalist,
-                ),
-            ],
-            Field(**self._get_field_attrs()),
+    def get_annotation(self, mode: Mode = "python") -> tuple[Any, "FieldInfo"]:
+        return self._build_annotation(
+            Literal[tuple(self.choices)] if self.choices is not None else str,
+            StringConstraints(mode=mode, pattern=self.pattern),
+            mode=mode,
         )
 
 
@@ -1848,7 +1811,7 @@ class FormModel(BaseModel):
 
 
 def build_form(
-    options: Iterable[AnyOption], name: str = "DynamicForm"
+    options: Iterable[AnyOption], mode: Mode = "python", name: str = "DynamicForm"
 ) -> Type[FormModel]:
     """
     Returns a dynamic pydantic model class that can be used as a form.
@@ -1856,7 +1819,7 @@ def build_form(
     To avoid validation at instanciation, use `my_form.model_construct(**values)`
     """
     options_as_fields: Any = {
-        option.id: option.get_annotation()
+        option.id: option.get_annotation(mode="bash")  # FIXME hardcoded mode
         for option in options
         if isinstance(option, BaseInputOption)
     }
