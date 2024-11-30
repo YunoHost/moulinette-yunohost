@@ -63,8 +63,8 @@ def coerce_nonish_to_none(v: t.Any) -> t.Any:
 
 def coerce_comalist_to_list(v: t.Any) -> t.Any:
     if isinstance(v, str):
-        values = [value.strip() for value in v.split(",")]
-        v = [value for value in values if value]
+        values = [coerce_nonish_to_none(value) for value in v.split(",")]
+        v = [value.strip() for value in values if value]
 
     if isinstance(v, list) and len(v) < 1:
         return None
@@ -565,12 +565,9 @@ class ListConstraints:
         return schema
 
     def validate(self, v: t.Any) -> t.Any:
-        if isinstance(v, str):
-            v = v.strip().strip(",")
-            v = [coerce_nonish_to_none(v_) for v_ in v.split(",")]
-            v = [v_ for v_ in v if v_ is not None]
+        v = coerce_comalist_to_list(v)
 
-        if isinstance(v, list) and not len(v):
+        if v is None:
             if self.has_default:
                 raise PydanticUseDefault()
             return None
@@ -581,5 +578,5 @@ class ListConstraints:
     ) -> str:
         if not v:
             return ""
-            
+
         return ",".join([str(handler(item)) for item in v])
