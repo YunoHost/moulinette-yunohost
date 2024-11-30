@@ -640,9 +640,9 @@ class BaseInputOption(BaseOption):
     example: str | None = None
     placeholder: str | None = None
     redact: bool = False
+    multiple: bool = False
     optional: bool = False  # FIXME keep required as default?
     default: Any = None
-    multiple: bool = False
 
     @field_validator("default", mode="before")
     @classmethod
@@ -804,9 +804,9 @@ class PasswordOption(BaseInputOption):
 
     type: Literal[OptionType.password] = OptionType.password
     example: Literal[None] = None
-    default: Literal[None] = None
     redact: Literal[True] = True
     multiple: Literal[False] = False
+    default: Literal[None] = None
     _forbidden_chars: ClassVar[str] = FORBIDDEN_PASSWORD_CHARS
 
     def get_annotation(self, mode: Mode = "python") -> tuple[Any, "FieldInfo"]:
@@ -956,9 +956,9 @@ class BooleanOption(BaseInputOption):
     """
 
     type: Literal[OptionType.boolean] = OptionType.boolean
+    default: bool | int | str | None = False
     yes: Any = 1
     no: Any = 0
-    default: bool | int | str | None = False
     _yes_answers: ClassVar[set[str]] = {"1", "yes", "y", "true", "t", "on"}
     _no_answers: ClassVar[set[str]] = {"0", "no", "n", "false", "f", "off"}
 
@@ -1281,8 +1281,8 @@ class FileOption(BaseInputOption):
     """
 
     type: Literal[OptionType.file] = OptionType.file
-    accept: list[str] | None = None  # currently only used by the web-admin
     default: str | None = None
+    accept: list[str] | None = None  # currently only used by the web-admin
 
     def get_annotation(self, mode: Mode = "python") -> tuple[Any, "FieldInfo"]:
         return self._build_annotation(
@@ -1343,8 +1343,8 @@ class BaseChoicesOption(BaseInputOption):
 
 
 class BaseSelectOption(BaseChoicesOption):
-    default: str | None = None
     choices: dict[Any, Any] | list[Any]
+    default: str | None = None
 
     def get_annotation(self, mode: Mode = "python") -> tuple[Any, "FieldInfo"]:
         choices = tuple(
@@ -1417,15 +1417,15 @@ class TagsOption(BaseChoicesOption):
     """
 
     type: Literal[OptionType.tags] = OptionType.tags
+    multiple: Literal[True] = True
     choices: Annotated[
+        list[str] | None, BeforeValidator(coerce_comalist_to_list), BaseConstraints()
+    ] = None
+    default: Annotated[
         list[str] | None, BeforeValidator(coerce_comalist_to_list), BaseConstraints()
     ] = None
     pattern: Pattern | None = None
     icon: str | None = None
-    default: Annotated[
-        list[str] | None, BeforeValidator(coerce_comalist_to_list), BaseConstraints()
-    ] = None
-    multiple: Literal[True] = True
 
     @staticmethod
     def humanize(value, option={}) -> str:
@@ -1528,8 +1528,8 @@ class AppOption(BaseSelectOption):
     """
 
     type: Literal[OptionType.app] = OptionType.app
-    filter: JSExpression | None = None
     choices: dict[str, str]
+    filter: JSExpression | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -1624,8 +1624,8 @@ class GroupOption(BaseSelectOption):
     """
 
     type: Literal[OptionType.group] = OptionType.group
-    choices: dict[str, str]
     default: Literal["visitors", "all_users", "admins"] | None = "all_users"
+    choices: dict[str, str]
 
     @model_validator(mode="before")
     @classmethod
