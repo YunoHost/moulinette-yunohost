@@ -535,3 +535,51 @@ class FileConstraints:
         file.write_bytes(content)
 
         return str(file)
+
+
+@dataclass
+class ListConstraints:
+    mode: Mode = "python"
+    has_default: bool = False
+
+    def __get_pydantic_core_schema__(
+        self, source_type: t.Any, handler: "GetCoreSchemaHandler"
+    ) -> "CoreSchema":
+        schema = handler(source_type)
+        type_schema = find_type_schema(schema, "list")
+
+        if not type_schema:
+            return schema
+
+        schema = cs.no_info_before_validator_function(
+            self.validate,
+            schema,
+            serialization=(
+                cs.wrap_serializer_function_ser_schema(
+                    self.serialize,
+                    schema=type_schema["items_schema"],
+                )
+            ),
+        )
+
+        return schema
+
+    def validate(self, v: t.Any) -> t.Any:
+        if isinstance(v, str):
+            v = v.strip().strip(",")
+            v = [coerce_nonish_to_none(v_) for v_ in v.split(",")]
+            v = [v_ for v_ in v if v_ is not None]
+
+        if isinstance(v, list) and not len(v):
+            if self.has_default:
+                raise PydanticUseDefault()
+            return None
+
+        return v
+    def serialize(
+        self, v: list[t.Any] | None, handler: "SerializerFunctionWrapHandler"
+    ) -> str:
+        if not v:
+            return ""
+            
+        return ",".join([str(handler(item)) for item in v])
