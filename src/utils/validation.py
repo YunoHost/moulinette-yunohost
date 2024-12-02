@@ -164,6 +164,7 @@ class BaseConstraints:
 class StringConstraints(BaseConstraints):
     pattern: Pattern | None = None
     strip_whitespace: bool = True
+    multiline: bool = False
 
     def __get_pydantic_core_schema__(
         self, source_type: t.Any, handler: "GetCoreSchemaHandler"
@@ -175,14 +176,17 @@ class StringConstraints(BaseConstraints):
             return schema
 
         str_schema.update(
-            cs.no_info_wrap_validator_function(
-                self.pattern_error_wrapper,
-                cs.str_schema(
-                    pattern=self.pattern.regexp if self.pattern else None,
-                    strip_whitespace=self.strip_whitespace,
-                    coerce_numbers_to_str=True,
+            cs.no_info_after_validator_function(
+                self.validate,
+                cs.no_info_wrap_validator_function(
+                    self.pattern_error_wrapper,
+                    cs.str_schema(
+                        pattern=self.pattern.regexp if self.pattern else None,
+                        strip_whitespace=self.strip_whitespace,
+                        coerce_numbers_to_str=True,
+                    ),
                 ),
-            ),
+            )
         )
 
         return self.apply_base_schema(schema)
@@ -206,6 +210,15 @@ class StringConstraints(BaseConstraints):
                     "string_pattern_mismatch", str(self.pattern.error)
                 )
             raise err
+
+    def validate(self, v: str) -> str:
+        if not self.multiline and "\n" in v or "\r" in v:
+            raise PydanticCustomError(
+                "multiline",
+                "String contains multiline character",
+            )
+
+        return v
 
 
 FORBIDDEN_PASSWORD_CHARS = r"{}"

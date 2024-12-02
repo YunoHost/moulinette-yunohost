@@ -692,10 +692,8 @@ class TestString(BaseTest):
         ("  \\n value\\n", "\\n value\\n"),
         ("  \tvalue\t", "value"),
         (r" ##value \n \tvalue\n  ", r"##value \n \tvalue\n"),
-        *xpass(scenarios=[
-            ("value\nvalue", "value\nvalue"),
-            (" ##value \n \tvalue\n  ", "##value \n \tvalue"),
-        ], reason=r"should fail or without `\n`?"),
+        ("value\nvalue", FAIL),
+        (" ##value \n \tvalue\n  ", FAIL),
         # test pattern
         ("value", FAIL, {"pattern": {"regexp": r'^[A-F]\d\d$', "error": "Provide a room like F12 : one uppercase and 2 numbers"}}),
         ("F12", "F12", {"pattern": {"regexp": r'^[A-F]\d\d$', "error": "Provide a room like F12 : one uppercase and 2 numbers"}}),

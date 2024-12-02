@@ -735,6 +735,7 @@ class BaseStringOption(BaseInputOption):
                 redact=self.redact,
                 pattern=self.pattern,
                 strip_whitespace=False if is_text_option else True,
+                multiline=is_text_option,
             ),
             mode=mode,
         )
