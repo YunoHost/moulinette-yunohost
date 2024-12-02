@@ -1360,7 +1360,7 @@ class BaseChoicesOption(BaseInputOption):
 
 
 class BaseSelectOption(BaseChoicesOption):
-    choices: dict[Any, Any] | list[Any]
+    choices: dict[str, str] | list[str]
     default: str | list[str] | None = None
 
     def get_annotation(self, mode: Mode = "python") -> tuple[Any, "FieldInfo"]:
@@ -1399,7 +1399,7 @@ class SelectOption(BaseSelectOption):
 
     type: Literal[OptionType.select] = OptionType.select
     choices: Annotated[
-        list[Any] | dict[Any, Any],
+        list[str] | dict[str, str],
         BeforeValidator(coerce_comalist_to_list),
         BaseConstraints(),
     ]

@@ -1452,23 +1452,11 @@ class TestSelect(BaseTest):
         },
         # custom bash style list as choices (only strings for now)
         ("one", "one", {"choices": "one,two"}),
-        {
-            # [-1, 0, 1]
-            "raw_options": [
-                {"choices": [-1, 0, 1, 10]},
-            ],
-            "scenarios": [
-                *nones(None, "", output=""),
-                *unchanged(-1, 0, 1, 10),
-                *xfail(scenarios=[
-                    ("-1", -1),
-                    ("0", 0),
-                    ("1", 1),
-                    ("10", 10),
-                ], reason="str -> int not handled"),
-                *all_fails("100", 100),
-            ]
-        },
+        # Choices can only be strings
+        (1, YunohostError, {"choices": [-1, 0, 1, 10]}), 
+        (1, YunohostError, {"choices": {-1: "verbose -one", 0: "verbose zero", 1: "verbose one", 10: "verbose ten"}}),
+        (True, YunohostError, {"choices": [True, False, None]}),
+        ("one", YunohostError, {"choices": ["one", 2, True]}),
         {
             "raw_options": [
                 {"choices": {"-1": "verbose -one", "0": "verbose zero", "1": "verbose one", "10": "verbose ten"}},
@@ -1478,32 +1466,6 @@ class TestSelect(BaseTest):
                 *all_fails(-1, 0, 1, 10),  # Should pass? converted to str?
                 *unchanged("-1", "0", "1", "10"),
                 *all_fails("100", 100),
-            ]
-        },
-        {
-            "raw_options": [
-                {"choices": {-1: "verbose -one", 0: "verbose zero", 1: "verbose one", 10: "verbose ten"}},
-            ],
-            "scenarios": [
-                *nones(None, "", output=""),
-                *unchanged(-1, 0, 1, 10), 
-                *all_fails("-1", "0", "1", "10"),
-                *all_fails("100", 100),
-            ]
-        },
-        # [True, False, None]
-        *unchanged(True, False, raw_option={"choices": [True, False, None]}),  # FIXME we should probably forbid None in choices
-        (None, "", {"choices": [True, False, None]}),
-        {
-            # mixed types
-            "raw_options": [{"choices": ["one", 2, True]}],
-            "scenarios": [
-                *xpass(scenarios=[
-                    ("one", "one"),
-                    (2, 2),
-                    (True, True),
-                ], reason="mixed choices, should fail"),
-                *all_fails("2", "True", "y"),
             ]
         },
         {
@@ -1523,7 +1485,7 @@ class TestSelect(BaseTest):
         # multiple
         *nones(None, "", ",", ", , ", [], output="", raw_option={"multiple": True, "choices": ["one", "two"]}),
         *commons("one, two ", output="one,two", raw_option={"multiple": True, "choices": "one,two"}),
-        ([-1, 0, 1, 10], "-1,0,1,10", {"multiple": True, "choices": {-1: "verbose -one", 0: "verbose zero", 1: "verbose one", 10: "verbose ten"}}),
+        (["-1", "0", "1", "10"], "-1,0,1,10", {"multiple": True, "choices": {"-1": "verbose -one", "0": "verbose zero", "1": "verbose one", "10": "verbose ten"}}),
         *all_fails([[]], {}, [True], [1], raw_option={"multiple": True, "choices": ["one"]}),
     ]
     # fmt: on
