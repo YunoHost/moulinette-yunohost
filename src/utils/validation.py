@@ -37,7 +37,9 @@ class Pattern:
 
 
 # TYPE CHECKING
-NONISH_VALUES: t.Final = (None, "")  # null, nil, undefined
+NONISH_VALUES: t.Final = (None, "", "none", "_none")  # null, nil, undefined
+
+
 def is_nonish(v: t.Any) -> bool:
     v = v.strip().lower() if isinstance(v, str) else v
     return True if v in NONISH_VALUES else False
@@ -126,6 +128,7 @@ class BaseConstraints:
     has_default: bool = False
     redact: bool = False
     serializer: t.Callable | None = None
+    none_value: t.Any = ""
 
     def __get_pydantic_core_schema__(
         self, source_type: t.Any, handler: "GetCoreSchemaHandler"
@@ -134,9 +137,16 @@ class BaseConstraints:
 
     def apply_base_schema(self, schema: "CoreSchema") -> "CoreSchema":
         return cs.no_info_before_validator_function(
-            (coerce_nonish_to_default if self.has_default else coerce_nonish_to_none),
+            self.preparse,
             schema,
             serialization=cs.wrap_serializer_function_ser_schema(self.wrap_serializer),
+        )
+
+    def preparse(self, v: t.Any) -> t.Any:
+        return (
+            coerce_nonish_to_default(v)
+            if self.has_default
+            else coerce_nonish_to_none(v)
         )
 
     def serialize(self, v: t.Any) -> t.Any:
@@ -152,7 +162,7 @@ class BaseConstraints:
         if self.serializer:
             v = self.serializer(v)
 
-        v = serialize_none_to_empty_str(v)
+        v = self.none_value if v is None else v
 
         if self.redact and v not in NONISH_VALUES:
             redact(v)
@@ -280,6 +290,7 @@ class NumberConstraints(BaseConstraints):
     min: int | None = None
     max: int | None = None
     step: int | None = None
+    none_value: t.Any = None
 
     def __get_pydantic_core_schema__(
         self, source_type: t.Any, handler: "GetCoreSchemaHandler"
@@ -299,7 +310,7 @@ class NumberConstraints(BaseConstraints):
         )
 
         schema = cs.no_info_before_validator_function(
-            (coerce_nonish_to_default if self.has_default else coerce_nonish_to_none),
+            self.preparse,
             schema,
         )
 
@@ -325,9 +336,7 @@ class BooleanConstraints(BaseConstraints):
         return schema
 
     def validate(self, v: t.Any) -> t.Any:
-        v = v.strip().lower() if isinstance(v, str) else v
-        if v in (None, "", "_none", "none"):
-            return None
+        v = self.preparse(v)
 
         if v == self.serialization[0]:
             return True
@@ -535,6 +544,7 @@ class FileConstraints(BaseConstraints):
 class ListConstraints:
     mode: Mode = "python"
     has_default: bool = False
+    none_value: t.Any = ""
 
     def __get_pydantic_core_schema__(
         self, source_type: t.Any, handler: "GetCoreSchemaHandler"
@@ -571,6 +581,6 @@ class ListConstraints:
         self, v: list[t.Any] | None, handler: "SerializerFunctionWrapHandler"
     ) -> str:
         if not v:
-            return ""
+            return self.none_value
 
         return ",".join([str(handler(item)) for item in v])

@@ -690,6 +690,7 @@ class BaseInputOption(BaseOption):
         type_: Any,
         *validators: Any,
         mode: Mode = "python",
+        none_value: Any = "",
     ) -> tuple[Any, "FieldInfo"]:
         field = Field(**self._get_field_attrs())
         anno: Any = Annotated[
@@ -700,7 +701,13 @@ class BaseInputOption(BaseOption):
         if self.multiple:
             anno = Annotated[
                 list[anno] | None if self.optional else list[anno],
-                (ListConstraints(mode=mode, has_default=self.default is not None)),
+                (
+                    ListConstraints(
+                        mode=mode,
+                        has_default=self.default is not None,
+                        none_value=none_value,
+                    )
+                ),
             ]
 
         return (anno, field)
@@ -1572,6 +1579,20 @@ class AppOption(BaseSelectOption):
         values["default"] = None
 
         return values
+
+    def get_annotation(self, mode: Mode = "python") -> tuple[Any, "FieldInfo"]:
+        choices = tuple(self.choices.keys())
+        return self._build_annotation(
+            Literal[tuple(choices)],
+            BaseConstraints(
+                mode=mode,
+                has_default=self.default is not None and not self.multiple,
+                redact=self.redact,
+                none_value="_none",
+            ),
+            mode=mode,
+            none_value="_none",
+        )
 
 
 class UserOption(BaseSelectOption):
