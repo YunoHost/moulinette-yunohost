@@ -150,7 +150,7 @@ class BaseConstraints:
 
         v = serialize_none_to_empty_str(v)
 
-        if self.redact:
+        if self.redact and v not in NONISH_VALUES:
             redact(v)
 
         return v
