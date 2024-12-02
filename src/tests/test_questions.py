@@ -1075,7 +1075,7 @@ class TestEmail(BaseTest):
 
         *nones(None, "", output=""),
         ("\n Abc@example.tld  ", "Abc@example.tld"),
-        *xfail(scenarios=[("admin@ynh.local", "admin@ynh.local")], reason="Should this pass?"),
+        ("admin@ynh.local", "admin@ynh.local"),
         # readonly
         ("Abc@example.tld", "admin@ynh.org", {"readonly": True, "default": "admin@ynh.org"}),
 

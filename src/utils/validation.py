@@ -1,4 +1,5 @@
 import datetime
+import email_validator
 import typing as t
 import urllib
 from dataclasses import dataclass
@@ -19,6 +20,9 @@ if t.TYPE_CHECKING:
     )
     from pydantic_core import CoreSchema
 
+# Hackish way of allowing some special use tlds
+for ext in ("test", "local", "localhost"):
+    email_validator.SPECIAL_USE_DOMAIN_NAMES.remove(ext)
 
 logger = getLogger("yunohost.validation")
 
