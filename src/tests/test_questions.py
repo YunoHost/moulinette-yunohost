@@ -314,6 +314,21 @@ def nones(
     ]
 
 
+def commons(v, output, raw_option: dict[str, Any] = {}) -> list[PartialScenario]:
+    """
+    Returns common scenarios for valid values.
+    - valid value -> valid value
+    - valid value + optional -> valid value
+    - empty value + default valid value -> valid value
+    """
+    return [
+        (v, output, raw_option),
+        (v, output, {"optional": True} | raw_option),
+        ("", output, {"default": v} | raw_option),
+        ("", output, {"default": v, "optional": True} | raw_option),
+    ]
+
+
 def unchanged(*args, raw_option: dict[str, Any] = {}) -> list[PartialScenario]:
     """
     Returns a series of params for which output is expected to be the same as its intake
