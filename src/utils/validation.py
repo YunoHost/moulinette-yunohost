@@ -163,6 +163,7 @@ class BaseConstraints:
 @dataclass
 class StringConstraints(BaseConstraints):
     pattern: Pattern | None = None
+    strip_whitespace: bool = True
 
     def __get_pydantic_core_schema__(
         self, source_type: t.Any, handler: "GetCoreSchemaHandler"
@@ -178,7 +179,7 @@ class StringConstraints(BaseConstraints):
                 self.pattern_error_wrapper,
                 cs.str_schema(
                     pattern=self.pattern.regexp if self.pattern else None,
-                    strip_whitespace=True,
+                    strip_whitespace=self.strip_whitespace,
                     coerce_numbers_to_str=True,
                 ),
             ),
@@ -230,7 +231,6 @@ class PasswordConstraints(BaseConstraints):
             cs.no_info_after_validator_function(
                 self.validate,
                 cs.str_schema(
-                    strip_whitespace=True,
                     max_length=127,
                     coerce_numbers_to_str=True,
                 ),

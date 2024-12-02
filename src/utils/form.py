@@ -726,6 +726,7 @@ class BaseStringOption(BaseInputOption):
     pattern: Pattern | None = None
 
     def get_annotation(self, mode: Mode = "python") -> tuple[Any, "FieldInfo"]:
+        is_text_option = True if self.type == OptionType.text else False
         return self._build_annotation(
             str,
             StringConstraints(
@@ -733,6 +734,7 @@ class BaseStringOption(BaseInputOption):
                 has_default=self.default is not None and not self.multiple,
                 redact=self.redact,
                 pattern=self.pattern,
+                strip_whitespace=False if is_text_option else True,
             ),
             mode=mode,
         )

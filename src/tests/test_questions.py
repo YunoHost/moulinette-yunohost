@@ -742,14 +742,7 @@ class TestText(BaseTest):
         ("value", FAIL, {"pattern": {"regexp": r'^[A-F]\d\d$', "error": "Provide a room like F12 : one uppercase and 2 numbers"}}),
         ("F12", "F12", {"pattern": {"regexp": r'^[A-F]\d\d$', "error": "Provide a room like F12 : one uppercase and 2 numbers"}}),
         # test no strip
-        *xpass(scenarios=[
-            ("value\n", "value"),
-            ("  \n value\n", "value"),
-            ("  \\n value\\n", "\\n value\\n"),
-            ("  \tvalue\t", "value"),
-            (" ##value \n \tvalue\n  ", "##value \n \tvalue"),
-            (r" ##value \n \tvalue\n  ", r"##value \n \tvalue\n"),
-        ], reason="Should not be stripped"),
+        *unchanged("value\n", "  \n value\n", "  \\n value\\n", "  \tvalue\t", " ##value \n \tvalue\n  ", r" ##value \n \tvalue\n  "),
         # readonly
         ("overwrite", "expected value", {"readonly": True, "default": "expected value"}),
         # multiple
@@ -782,10 +775,7 @@ class TestPassword(BaseTest):
         *nones(None, "", output=""),
         ("s3cr3t!!", YunohostError, {"default": "SUPAs3cr3t!!"}),  # default is forbidden
         ("s3cr3t!!", YunohostError, {"example": "SUPAs3cr3t!!"}),  # example is forbidden
-        *xpass(scenarios=[
-            (" value \n moarc0mpl1cat3d\n  ", "value \n moarc0mpl1cat3d"),
-            (" some_ value", "some_ value"),
-        ], reason="Should output exactly the same"),
+        *unchanged(" value \n moarc0mpl1cat3d\n  ", " some_ value"),
         ("s3cr3t!!", "s3cr3t!!"),
         ("secret", FAIL),
         *[("supersecret" + char, FAIL) for char in FORBIDDEN_PASSWORD_CHARS],  # FIXME maybe add ` \n` to the list?
