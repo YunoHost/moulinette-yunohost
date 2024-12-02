@@ -701,6 +701,14 @@ class TestString(BaseTest):
         ("F12", "F12", {"pattern": {"regexp": r'^[A-F]\d\d$', "error": "Provide a room like F12 : one uppercase and 2 numbers"}}),
         # readonly
         ("overwrite", "expected value", {"readonly": True, "default": "expected value"}),  # FIXME do we want to fail instead?
+        # multiple
+        *nones(None, "", ",", ", , ", [], output="", raw_option={"multiple": True}),
+        *commons("one,two", output="one,two", raw_option={"multiple": True}),
+        *commons(["one", "two"], output="one,two", raw_option={"multiple": True}),
+        ([1, 2], "1,2", {"multiple": True}),
+        *all_fails([[]], [True], {}, 1, 0, raw_option={"multiple": True}),
+        ("value,F12", FAIL, {"multiple": True, "pattern": {"regexp": r'^[A-F]\d\d$'}}),
+        ("F12,A57", "F12,A57", {"multiple": True, "pattern": {"regexp": r'^[A-F]\d\d$'}}),
     ]
     # fmt: on
 
@@ -744,6 +752,14 @@ class TestText(BaseTest):
         ], reason="Should not be stripped"),
         # readonly
         ("overwrite", "expected value", {"readonly": True, "default": "expected value"}),
+        # multiple
+        *nones(None, "", output="", raw_option={"multiple": True}),
+        *commons("one\none,two", output="one\none,two", raw_option={"multiple": True}),
+        *commons(["one\none", "two"], output="one\none,two", raw_option={"multiple": True}),
+        ([1, 2], "1,2", {"multiple": True}),
+        *all_fails([[]], [True], {}, [1], raw_option={"multiple": True}),
+        ("value,F12", FAIL, {"multiple": True, "pattern": {"regexp": r'^[A-F]\d\d$'}}),
+        ("F12,A57", "F12,A57", {"multiple": True, "pattern": {"regexp": r'^[A-F]\d\d$'}}),
     ]
     # fmt: on
 
@@ -775,6 +791,7 @@ class TestPassword(BaseTest):
         *[("supersecret" + char, FAIL) for char in FORBIDDEN_PASSWORD_CHARS],  # FIXME maybe add ` \n` to the list?
         # readonly
         ("s3cr3t!!", YunohostError, {"readonly": True}),  # readonly is forbidden
+        ("s3cr3t!!,anothersecret", YunohostError, {"multiple": True}),  # multiple is forbidden
     ]
     # fmt: on
 
@@ -813,6 +830,11 @@ class TestColor(BaseTest):
         ("#01010101af", FAIL),
         # readonly
         ("#ffff00", "#000", {"readonly": True, "default": "#000"}),
+        # multiple
+        *nones(None, "", ",", ", , ", [], output="", raw_option={"multiple": True}),
+        *commons("red,yellow", output="#f00,#ff0", raw_option={"multiple": True}),
+        *commons(["red", "yellow"], "#f00,#ff0", {"multiple": True}),
+        *all_fails([[]], [True], {}, [1, 2], ["#gggggg"], raw_option={"multiple": True}),
     ]
     # fmt: on
 
@@ -851,6 +873,18 @@ class TestNumber(BaseTest):
         (-10, -10, {"default": 10, "optional": True}),
         # readonly
         (1337, 10000, {"readonly": True, "default": "10000"}),
+        # multiple
+        *nones(None, "", ",", ", , ", [], output="", raw_option={"multiple": True}),
+        *xfail(scenarios=[
+            ("none", ""),
+            ("_none", ""), 
+        ], reason="Should output as `'' | None`"),
+        *commons("1,2", output="1,2", raw_option={"multiple": True}),
+        *commons(["1", "2"], output="1,2", raw_option={"multiple": True}),
+        *commons([1, 2], output="1,2", raw_option={"multiple": True}),
+        (" 1,,2", "1,2", {"multiple": True, "optional": True}),
+        ([True, False], "1,0", {"multiple": True}), # FIXME Should this pass?
+        *all_fails([[]], {}, 1, 0, ["one"], raw_option={"multiple": True}),
     ]
     # fmt: on
     # FIXME should `step` be some kind of "multiple of"?
@@ -922,6 +956,15 @@ class TestBoolean(BaseTest):
         },
         # readonly
         (1, 0, {"readonly": True, "default": 0}),
+        # multiple
+        *nones(None, "", ",", ", , ", [], output="", raw_option={"multiple": True, "default": None}),
+        *commons("1,0", output="1,0", raw_option={"multiple": True}),
+        *commons(["1", "False"], output="1,0", raw_option={"multiple": True}),
+        *commons([True, 0], output="1,0", raw_option={"multiple": True}),
+        (" True,,no", "1,0", {"multiple": True, "optional": True}),
+        ([True, False], "1,0", {"multiple": True}),
+        ("n,y", "disallow,allow", {"yes": "allow", "no": "disallow", "multiple": True}),
+        *all_fails([[]], {}, 1, 0, ["one"], raw_option={"multiple": True}),
     ]
 
 
@@ -960,6 +1003,13 @@ class TestDate(BaseTest):
         ("2022-02-29", FAIL),
         # readonly
         ("2070-12-31", "2024-02-29", {"readonly": True, "default": "2024-02-29"}),
+        # multiple
+        *nones(None, "", ",", ", , ", [], output="", raw_option={"multiple": True}),
+        *commons("2070-12-31,2025-06-15", output="2070-12-31,2025-06-15", raw_option={"multiple": True}),
+        ("2070-12-31,2025-06-15T13:45:30", "2070-12-31,2025-06-15", {"multiple": True}),
+        ([1749938400, "2024-02-29"], "2025-06-14,2024-02-29", {"multiple": True}),
+        *all_as([True], [1], output="1970-01-01", raw_option={"multiple": True}),
+        *all_fails([[]], {}, ["#gggggg"], raw_option={"multiple": True}),
     ]
     # fmt: on
 
@@ -997,6 +1047,12 @@ class TestTime(BaseTest):
         ("23:005", FAIL),
         # readonly
         ("00:00", "08:00", {"readonly": True, "default": "08:00"}),
+        # multiple
+        *nones(None, "", ",", ", , ", [], output="", raw_option={"multiple": True}),
+        *commons("22:35:05,12:19", output="22:35,12:19", raw_option={"multiple": True}),
+        ("22:35:03.514,1337", "22:35,00:22", {"multiple": True}),
+        *all_as([True], [1], " , 1,,", output="00:00", raw_option={"multiple": True}),
+        *all_fails([[]], {}, ["#gggggg"], ["24:00"], raw_option={"multiple": True}),
     ]
     # fmt: on
 
@@ -1087,7 +1143,12 @@ class TestEmail(BaseTest):
             "me@xn--0.tld",
             "me@yy--0.tld",
             "me@yy－－0.tld",
-        )
+        ),
+        # multiple
+        *nones(None, "", ",", ", , ", [], output="", raw_option={"multiple": True}),
+        *commons("Abc@example.tld,admin@ynh.org", output="Abc@example.tld,admin@ynh.org", raw_option={"multiple": True}),
+        (["admin@ynh.org", " jeff@臺網中心.tw"], "admin@ynh.org,jeff@臺網中心.tw", {"multiple": True}),
+        *all_fails([[]], {}, ["my@localhost"], [True], [1], " , 1,,", raw_option={"multiple": True}),
     ]
     # fmt: on
 
@@ -1101,7 +1162,7 @@ class TestWebPath(BaseTest):
     raw_option = {"type": "path", "id": "path_id"}
     prefill = {
         "raw_option": {"default": "some_path"},
-        "prefill": "/some_path",
+        "prefill": "some_path",
     }
     # fmt: off
     scenarios = [
@@ -1135,6 +1196,11 @@ class TestWebPath(BaseTest):
         # readonly
         ("/overwrite", "/value", {"readonly": True, "default": "/value"}),
         # FIXME should path have forbidden_chars?
+        # multiple
+        *nones(None, "", ",", ", , ", [], output="", raw_option={"multiple": True}),
+        *commons("value\n,https://example.com/folder", output="/value,/folder", raw_option={"multiple": True}),
+        ("//value, , 1,,", "/value,/1", {"multiple": True}),
+        *all_fails([[]], {}, [True], [1], raw_option={"multiple": True}),
     ]
     # fmt: on
 
@@ -1234,6 +1300,10 @@ class TestUrl(BaseTest):
             "http://[192.168.1.1]:8329",
             "http://example.com:99999",
         ),
+        *nones(None, "", ",", ", , ", [], output="", raw_option={"multiple": True}),
+        *commons("http://123.45.67.8/\n,https://example.com/folder", output="http://123.45.67.8/,https://example.com/folder", raw_option={"multiple": True}),
+        ("http://example/#, , http://example.com,,", "http://example/#,http://example.com/", {"multiple": True}),
+        *all_fails([[]], {}, [True], [1], raw_option={"multiple": True}),
     ]
     # fmt: on
 
@@ -1273,19 +1343,19 @@ def _test_file_intake_may_fail(raw_option, intake, expected_output):
     if inspect.isclass(expected_output) and issubclass(expected_output, Exception):
         with pytest.raises(expected_output):
             _fill_or_prompt_one_option(raw_option, intake)
+    else:
+        option, value = _fill_or_prompt_one_option(raw_option, intake)
 
-    option, value = _fill_or_prompt_one_option(raw_option, intake)
+        # The file is supposed to be copied somewhere else
+        assert value != intake
+        assert value.startswith("/tmp/ynh_filequestion_")
+        assert os.path.exists(value)
+        with open(value) as f:
+            assert f.read() == expected_output
 
-    # The file is supposed to be copied somewhere else
-    assert value != intake
-    assert value.startswith("/tmp/ynh_filequestion_")
-    assert os.path.exists(value)
-    with open(value) as f:
-        assert f.read() == expected_output
+        FileOption.clean_upload_dirs()
 
-    FileOption.clean_upload_dirs()
-
-    assert not os.path.exists(value)
+        assert not os.path.exists(value)
 
 
 file_content1 = "helloworld"
@@ -1304,6 +1374,7 @@ class TestFile(BaseTest):
     scenarios = [
         *nones(None, "", output=""),
         *unchanged(file_content1, file_content2),
+        (file_content1, YunohostError, {"multiple": True}) # multiple forbidden for now
         # other type checks are done in `test_wrong_intake`
     ]
     # fmt: on
@@ -1468,6 +1539,11 @@ class TestSelect(BaseTest):
         },
         # readonly
         ("one", "two", {"readonly": True, "choices": ["one", "two"], "default": "two"}),
+        # multiple
+        *nones(None, "", ",", ", , ", [], output="", raw_option={"multiple": True, "choices": ["one", "two"]}),
+        *commons("one, two ", output="one,two", raw_option={"multiple": True, "choices": "one,two"}),
+        ([-1, 0, 1, 10], "-1,0,1,10", {"multiple": True, "choices": {-1: "verbose -one", 0: "verbose zero", 1: "verbose one", 10: "verbose ten"}}),
+        *all_fails([[]], {}, [True], [1], raw_option={"multiple": True, "choices": ["one"]}),
     ]
     # fmt: on
 
@@ -1486,7 +1562,7 @@ class TestTags(BaseTest):
     }
     # fmt: off
     scenarios = [
-        *nones(None, [], "", ",", output=""),
+        *nones(None, "", ",", ", , ", [], output=""),
         {
             "raw_options": [
                 {},
@@ -1512,6 +1588,9 @@ class TestTags(BaseTest):
         *all_fails(*([str(t)] for t in [False, True, -1, 0, 1, 1337, 13.37, [], ["one"], {}]), raw_option={"choices": [False, True, -1, 0, 1, 1337, 13.37, [], ["one"], {}]}, error=YunohostError),
         # readonly
         ("one", "one,two", {"readonly": True, "choices": ["one", "two"], "default": "one,two"}),
+        # pattern
+        ("value", FAIL, {"pattern": {"regexp": r'^[A-F]\d\d$', "error": "Provide a room like F12 : one uppercase and 2 numbers"}}),
+        ("F12,A80", "F12,A80", {"pattern": {"regexp": r'^[A-F]\d\d$', "error": "Provide a room like F12 : one uppercase and 2 numbers"}}),
     ]
     # fmt: on
 
@@ -1570,6 +1649,11 @@ class TestDomain(BaseTest):
                 (domains2[0], domains2[0], {}),
                 ("doesnt_exist.pouet", FAIL, {}),
                 ("fake.com", FAIL, {"choices": ["fake.com"]}),
+                # multiple
+                *nones(None, "", ",", ", , ", [], output=domains2[1], raw_option={"multiple": True}, fail_if_required=False),
+                *commons(f"{domains1[0]}, {domains2[0]} ", output=f"{domains1[0]},{domains2[0]}", raw_option={"multiple": True}),
+                ("fake.com", FAIL, {"multiple": True, "choices": ["fake.com"]}),
+                *all_fails([[]], {}, [True], [1], raw_option={"multiple": True}),
             ]
         },
 
@@ -1651,6 +1735,11 @@ class TestApp(BaseTest):
                 (installed_webapp["id"], FAIL, {"filter": "is_webapp == false"}),
                 (installed_webapp["id"], FAIL, {"filter": "id != 'my_webapp'"}),
                 (None, "", {"filter": "id == 'fake_app'", "optional": True}),
+                # multiple
+                *nones(None, "", ",", ", , ", [], output="", raw_option={"multiple": True}), # FIXME Should return chosen none?
+                *commons(f"{installed_webapp['id']}, , ", output=installed_webapp['id'], raw_option={"multiple": True, "filter": "is_webapp"}),
+                ("fake_app", FAIL, {"multiple": True, "choices": ["fake_app"]}),
+                *all_fails([[]], {}, [True], [1], raw_option={"multiple": True}),
             ]
         },
         {
@@ -1660,6 +1749,8 @@ class TestApp(BaseTest):
                 (installed_non_webapp["id"], FAIL, {"filter": "is_webapp"}),
                 # readonly
                 (installed_non_webapp["id"], YunohostError, {"readonly": True}),  # readonly is forbidden
+                # multiple
+                *commons(f"{installed_webapp['id']}, ,{installed_non_webapp['id']}", output=f"{installed_webapp['id']},{installed_non_webapp['id']}", raw_option={"multiple": True}),
             ]
         },
     ]
@@ -1759,6 +1850,11 @@ class TestUser(BaseTest):
                 ], reason="Should throw 'no default allowed'"),
                 # readonly
                 (admin_username, YunohostError, {"readonly": True}),  # readonly is forbidden
+                # multiple
+                *nones(None, "", ",", ", , ", [], output=admin_username, raw_option={"multiple": True}, fail_if_required=False),
+                *commons(f"{admin_username}, {regular_username} ", output=f"{admin_username},{regular_username}", raw_option={"multiple": True}),
+                ("fake_user", FAIL, {"multiple": True, "choices": ["fake_user"]}),
+                *all_fails([[]], {}, [True], [1], raw_option={"multiple": True}),
             ]
         },
     ]
@@ -1835,6 +1931,12 @@ class TestGroup(BaseTest):
                 ("", YunohostError, {"default": "custom_group"}),  # Not allowed to set a default which is not a default group
                 # readonly
                 ("admins", YunohostError, {"readonly": True}),  # readonly is forbidden
+                # multiple
+                *nones(None, "", ",", ", , ", [], output="all_users", raw_option={"multiple": True}, fail_if_required=False),
+                *commons("admins, visitors ", output="admins,visitors", raw_option={"multiple": True}),
+                (["custom_group", "visitors"], "custom_group,visitors", {"multiple": True}),
+                ("fake_group", FAIL, {"multiple": True, "choices": ["fake_group"]}),
+                *all_fails([[]], {}, [True], [1], raw_option={"multiple": True}),
             ]
         },
     ]
