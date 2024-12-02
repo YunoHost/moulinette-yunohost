@@ -390,7 +390,7 @@ class BaseOption(BaseModel):
     type: OptionType
     id: str
     mode: Mode = (
-        "bash"  # TODO use "python" as default mode with AppConfigPanel setuping it to "bash"
+        "string"  # TODO use "normal" as default mode with AppConfigPanel setuping it to "string"
     )
     ask: Translation | None = None
     readonly: bool = False
@@ -689,7 +689,7 @@ class BaseInputOption(BaseOption):
         self,
         type_: Any,
         *validators: Any,
-        mode: Mode = "python",
+        mode: Mode = "normal",
         none_value: Any = "",
     ) -> tuple[Any, "FieldInfo"]:
         field = Field(**self._get_field_attrs())
@@ -712,7 +712,7 @@ class BaseInputOption(BaseOption):
 
         return (anno, field)
 
-    def get_annotation(self, mode: Mode = "python") -> tuple[Any, "FieldInfo"]:
+    def get_annotation(self, mode: Mode = "normal") -> tuple[Any, "FieldInfo"]:
         raise NotImplementedError()
 
     def _get_prompt_message(self, value: Any) -> str:
@@ -732,7 +732,7 @@ class BaseStringOption(BaseInputOption):
     default: str | list[str] | None = None
     pattern: Pattern | None = None
 
-    def get_annotation(self, mode: Mode = "python") -> tuple[Any, "FieldInfo"]:
+    def get_annotation(self, mode: Mode = "normal") -> tuple[Any, "FieldInfo"]:
         is_text_option = True if self.type == OptionType.text else False
         return self._build_annotation(
             str,
@@ -814,7 +814,7 @@ class PasswordOption(BaseInputOption):
     default: Literal[None] = None
     _forbidden_chars: ClassVar[str] = FORBIDDEN_PASSWORD_CHARS
 
-    def get_annotation(self, mode: Mode = "python") -> tuple[Any, "FieldInfo"]:
+    def get_annotation(self, mode: Mode = "normal") -> tuple[Any, "FieldInfo"]:
         return self._build_annotation(
             str,
             PasswordConstraints(
@@ -859,7 +859,7 @@ class ColorOption(BaseInputOption):
 
         return super(ColorOption, ColorOption).normalize(value, option)
 
-    def get_annotation(self, mode: Mode = "python") -> tuple[Any, "FieldInfo"]:
+    def get_annotation(self, mode: Mode = "normal") -> tuple[Any, "FieldInfo"]:
         return self._build_annotation(
             Color,
             BaseConstraints(
@@ -925,7 +925,7 @@ class NumberOption(BaseInputOption):
             error=m18n.n("invalid_number"),
         )
 
-    def get_annotation(self, mode: Mode = "python") -> tuple[Any, "FieldInfo"]:
+    def get_annotation(self, mode: Mode = "normal") -> tuple[Any, "FieldInfo"]:
         return self._build_annotation(
             int,
             NumberConstraints(
@@ -1054,7 +1054,7 @@ class BooleanOption(BaseInputOption):
             choices="yes/no",
         )
 
-    def get_annotation(self, mode: Mode = "python") -> tuple[Any, "FieldInfo"]:
+    def get_annotation(self, mode: Mode = "normal") -> tuple[Any, "FieldInfo"]:
         return self._build_annotation(
             bool,
             BooleanConstraints(
@@ -1100,7 +1100,7 @@ class DateOption(BaseInputOption):
     redact: Literal[False] = False
     default: datetime.date | list[datetime.date] | None = None
 
-    def get_annotation(self, mode: Mode = "python") -> tuple[Any, "FieldInfo"]:
+    def get_annotation(self, mode: Mode = "normal") -> tuple[Any, "FieldInfo"]:
         return self._build_annotation(
             datetime.date,
             DatetimeConstraints(
@@ -1136,7 +1136,7 @@ class TimeOption(BaseInputOption):
     def humanize(v: Any, option={}) -> str:
         return v.strftime("%H:%M") if v else v
 
-    def get_annotation(self, mode: Mode = "python") -> tuple[Any, "FieldInfo"]:
+    def get_annotation(self, mode: Mode = "normal") -> tuple[Any, "FieldInfo"]:
         return self._build_annotation(
             datetime.time,
             DatetimeConstraints(
@@ -1169,7 +1169,7 @@ class EmailOption(BaseInputOption):
     type: Literal[OptionType.email] = OptionType.email
     default: EmailStr | list[EmailStr] | None = None
 
-    def get_annotation(self, mode: Mode = "python") -> tuple[Any, "FieldInfo"]:
+    def get_annotation(self, mode: Mode = "normal") -> tuple[Any, "FieldInfo"]:
         return self._build_annotation(
             EmailStr,
             BaseConstraints(
@@ -1233,7 +1233,7 @@ class WebPathOption(BaseInputOption):
 
         return str(value)
 
-    def get_annotation(self, mode: Mode = "python") -> tuple[Any, "FieldInfo"]:
+    def get_annotation(self, mode: Mode = "normal") -> tuple[Any, "FieldInfo"]:
         return self._build_annotation(
             Path,
             PathConstraints(
@@ -1265,7 +1265,7 @@ class URLOption(BaseInputOption):
     redact: Literal[False] = False
     default: HttpUrl | list[HttpUrl] | None = None
 
-    def get_annotation(self, mode: Mode = "python") -> tuple[Any, "FieldInfo"]:
+    def get_annotation(self, mode: Mode = "normal") -> tuple[Any, "FieldInfo"]:
         return self._build_annotation(
             HttpUrl,
             BaseConstraints(
@@ -1306,7 +1306,7 @@ class FileOption(BaseInputOption):
     default: str | None = None
     accept: list[str] | None = None  # currently only used by the web-admin
 
-    def get_annotation(self, mode: Mode = "python") -> tuple[Any, "FieldInfo"]:
+    def get_annotation(self, mode: Mode = "normal") -> tuple[Any, "FieldInfo"]:
         return self._build_annotation(
             str,
             FileConstraints(
@@ -1370,7 +1370,7 @@ class BaseSelectOption(BaseChoicesOption):
     choices: dict[str, str] | list[str]
     default: str | list[str] | None = None
 
-    def get_annotation(self, mode: Mode = "python") -> tuple[Any, "FieldInfo"]:
+    def get_annotation(self, mode: Mode = "normal") -> tuple[Any, "FieldInfo"]:
         choices = tuple(
             self.choices if isinstance(self.choices, list) else self.choices.keys()
         )
@@ -1468,7 +1468,7 @@ class TagsOption(BaseChoicesOption):
             return ""
         return value
 
-    def get_annotation(self, mode: Mode = "python") -> tuple[Any, "FieldInfo"]:
+    def get_annotation(self, mode: Mode = "normal") -> tuple[Any, "FieldInfo"]:
         return self._build_annotation(
             Literal[tuple(self.choices)] if self.choices is not None else str,
             StringConstraints(
@@ -1580,7 +1580,7 @@ class AppOption(BaseSelectOption):
 
         return values
 
-    def get_annotation(self, mode: Mode = "python") -> tuple[Any, "FieldInfo"]:
+    def get_annotation(self, mode: Mode = "normal") -> tuple[Any, "FieldInfo"]:
         choices = tuple(self.choices.keys())
         return self._build_annotation(
             Literal[tuple(choices)],
@@ -1849,7 +1849,7 @@ class FormModel(BaseModel):
 
 
 def build_form(
-    options: Iterable[AnyOption], mode: Mode = "python", name: str = "DynamicForm"
+    options: Iterable[AnyOption], mode: Mode = "normal", name: str = "DynamicForm"
 ) -> Type[FormModel]:
     """
     Returns a dynamic pydantic model class that can be used as a form.
@@ -1857,7 +1857,7 @@ def build_form(
     To avoid validation at instanciation, use `my_form.model_construct(**values)`
     """
     options_as_fields: Any = {
-        option.id: option.get_annotation(mode="bash")  # FIXME hardcoded mode
+        option.id: option.get_annotation(mode="string")  # FIXME hardcoded mode
         for option in options
         if isinstance(option, BaseInputOption)
     }

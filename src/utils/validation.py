@@ -26,7 +26,7 @@ for ext in ("test", "local", "localhost"):
 
 logger = getLogger("yunohost.validation")
 
-Mode = t.Literal["python", "bash"]
+Mode = t.Literal["normal", "string"]
 Translation = dict[str, str] | str
 
 
@@ -124,7 +124,7 @@ def find_type_schema(schema: "CoreSchema", type_: str) -> t.Union["CoreSchema", 
 
 @dataclass
 class BaseConstraints:
-    mode: Mode = "python"
+    mode: Mode = "normal"
     has_default: bool = False
     redact: bool = False
     serializer: t.Callable | None = None
@@ -462,7 +462,7 @@ class FileConstraints(BaseConstraints):
         type_schema = find_type_schema(schema, "str")
         type_schema.update(
             cs.with_info_after_validator_function(
-                self.file_python if self.mode == "python" else self.file_bash,
+                self.file_normal if self.mode == "normal" else self.file_string,
                 cs.str_schema(),
             )
         )
@@ -496,8 +496,8 @@ class FileConstraints(BaseConstraints):
 
         return content, ext
 
-    def file_bash(self, v: str, info: "ValidationInfo") -> str:
-        """File handling for "bash" config panels (app)"""
+    def file_string(self, v: str, info: "ValidationInfo") -> str:
+        """File handling for "string" config panels (app)"""
         import tempfile
 
         content, _ = self._base_parse_file(v)
@@ -514,8 +514,8 @@ class FileConstraints(BaseConstraints):
 
         return file_path
 
-    def file_python(self, v: str, info: "ValidationInfo") -> str:
-        """File handling for "python" config panels"""
+    def file_normal(self, v: str, info: "ValidationInfo") -> str:
+        """File handling for "normal" config panels"""
         import hashlib
 
         assert self.bind is not None, f"File 'bind' is required for {info.field_name}."
@@ -542,7 +542,7 @@ class FileConstraints(BaseConstraints):
 
 @dataclass
 class ListConstraints:
-    mode: Mode = "python"
+    mode: Mode = "normal"
     has_default: bool = False
     none_value: t.Any = ""
 
