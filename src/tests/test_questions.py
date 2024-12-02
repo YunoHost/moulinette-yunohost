@@ -781,7 +781,7 @@ class TestPassword(BaseTest):
         *unchanged(" value \n moarc0mpl1cat3d\n  ", " some_ value"),
         ("s3cr3t!!", "s3cr3t!!"),
         ("secret", FAIL),
-        *[("supersecret" + char, FAIL) for char in FORBIDDEN_PASSWORD_CHARS],  # FIXME maybe add ` \n` to the list?
+        *[("supersecret" + char, FAIL) for char in FORBIDDEN_PASSWORD_CHARS],
         # readonly
         ("s3cr3t!!", YunohostError, {"readonly": True}),  # readonly is forbidden
         ("s3cr3t!!,anothersecret", YunohostError, {"multiple": True}),  # multiple is forbidden
@@ -851,8 +851,8 @@ class TestNumber(BaseTest):
 
         *nones(*NONISH_VALUES, output=None),
         *unchanged(0, 1, -1, 1337),
-        *all_as(False, "0", 0, output=0),  # FIXME should `False` fail instead?
-        *all_as(True, "1", 1, output=1),  # FIXME should `True` fail instead?
+        *all_as(False, "0", 0, output=0),
+        *all_as(True, "1", 1, output=1),
         *all_as("1337", 1337, output=1337),
         *all_as("-1", -1, output=-1),
         *all_fails(13.37, "13.37"),
@@ -872,7 +872,7 @@ class TestNumber(BaseTest):
         *commons(["1", "2"], output="1,2", raw_option={"multiple": True}),
         *commons([1, 2], output="1,2", raw_option={"multiple": True}),
         (" 1,,2", "1,2", {"multiple": True, "optional": True}),
-        ([True, False], "1,0", {"multiple": True}), # FIXME Should this pass?
+        ([True, False], "1,0", {"multiple": True}),
         *all_fails([[]], {}, 1, 0, ["one"], raw_option={"multiple": True}),
     ]
     # fmt: on
