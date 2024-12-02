@@ -1680,7 +1680,9 @@ class TestApp(BaseTest):
                 (None, "", {"filter": "id == 'fake_app'", "optional": True}),
                 # multiple
                 *nones(None, "", ",", ", , ", [], output="", raw_option={"multiple": True}), # FIXME Should return chosen none?
-                *commons(f"{installed_webapp['id']}, , ", output=installed_webapp['id'], raw_option={"multiple": True, "filter": "is_webapp"}),
+                (f"{installed_webapp['id']}, , ", installed_webapp['id'], {"multiple": True, "filter": "is_webapp"}),
+                (f"{installed_webapp['id']}, , ", installed_webapp['id'], {"multiple": True, "filter": "is_webapp", "optional": True}),
+                ("", "_none", {"multiple": True, "filter": "is_webapp", "optional": True, "default": installed_webapp['id']}),
                 ("fake_app", FAIL, {"multiple": True, "choices": ["fake_app"]}),
                 *all_fails([[]], {}, [True], [1], raw_option={"multiple": True}),
             ]
@@ -1693,7 +1695,9 @@ class TestApp(BaseTest):
                 # readonly
                 (installed_non_webapp["id"], YunohostError, {"readonly": True}),  # readonly is forbidden
                 # multiple
-                *commons(f"{installed_webapp['id']}, ,{installed_non_webapp['id']}", output=f"{installed_webapp['id']},{installed_non_webapp['id']}", raw_option={"multiple": True}),
+                (f"{installed_webapp['id']}, ,{installed_non_webapp['id']}", f"{installed_webapp['id']},{installed_non_webapp['id']}", {"multiple": True}),
+                (f"{installed_webapp['id']}, ,{installed_non_webapp['id']}", f"{installed_webapp['id']},{installed_non_webapp['id']}", {"multiple": True, "optional": True}),
+                ("", "_none", {"multiple": True, "optional": True, "default": installed_webapp['id']})
             ]
         },
     ]
@@ -1719,12 +1723,6 @@ class TestApp(BaseTest):
 
     def test_options_prompted_with_ask_help(self, prefill_data=None):
         with patch_apps(apps=[installed_webapp, installed_non_webapp]):
-            super().test_options_prompted_with_ask_help(
-                prefill_data={
-                    "raw_option": {"default": installed_webapp["id"]},
-                    "prefill": installed_webapp["id"],
-                }
-            )
             super().test_options_prompted_with_ask_help(
                 prefill_data={"raw_option": {"optional": True}, "prefill": ""}
             )
@@ -1788,14 +1786,14 @@ class TestUser(BaseTest):
                 {"users": {admin_username: admin_user, regular_username: regular_user}},
             ],
             "scenarios": [
-                *xpass(scenarios=[
-                    ("", regular_username, {"default": regular_username})
-                ], reason="Should throw 'no default allowed'"),
+                ("", admin_username, {"default": regular_username}), # default is overridden with first admin
                 # readonly
                 (admin_username, YunohostError, {"readonly": True}),  # readonly is forbidden
                 # multiple
                 *nones(None, "", ",", ", , ", [], output="", raw_option={"multiple": True}),
-                *commons(f"{admin_username}, {regular_username} ", output=f"{admin_username},{regular_username}", raw_option={"multiple": True}),
+                (f"{admin_username}, {regular_username} ", f"{admin_username},{regular_username}", {"multiple": True}),
+                (f"{admin_username}, {regular_username} ", f"{admin_username},{regular_username}", {"multiple": True, "optional": True}),
+                ("", "", {"multiple": True, "optional": True, "default": regular_username}), # no arbitrary default
                 ("fake_user", FAIL, {"multiple": True, "choices": ["fake_user"]}),
                 *all_fails([[]], {}, [True], [1], raw_option={"multiple": True}),
             ]
@@ -1815,11 +1813,11 @@ class TestUser(BaseTest):
             super().test_options_prompted_with_ask_help(
                 prefill_data={"raw_option": {}, "prefill": admin_username}
             )
-            # FIXME This should fail, not allowed to set a default
+            # custom default is overridden with base default
             super().test_options_prompted_with_ask_help(
                 prefill_data={
                     "raw_option": {"default": regular_username},
-                    "prefill": regular_username,
+                    "prefill": admin_username,
                 }
             )
 
