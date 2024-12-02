@@ -76,10 +76,6 @@ def serialize_none_to_empty_str(v: t.Any) -> t.Any:
     return "" if v is None else v
 
 
-def serialize_list_to_comalist(v: list[t.Any]) -> str:
-    return ",".join(v) if isinstance(v, list) else v
-
-
 # VALIDATORS
 
 
@@ -130,17 +126,24 @@ class BaseConstraints:
     def __get_pydantic_core_schema__(
         self, source_type: t.Any, handler: "GetCoreSchemaHandler"
     ) -> "CoreSchema":
-        schema = handler(source_type)
-        schema = cs.no_info_before_validator_function(
+        return self.apply_base_schema(handler(source_type))
+
+    def apply_base_schema(self, schema: "CoreSchema") -> "CoreSchema":
+        return cs.no_info_before_validator_function(
             (coerce_nonish_to_default if self.has_default else coerce_nonish_to_none),
             schema,
-            serialization=cs.wrap_serializer_function_ser_schema(self.serialize),
+            serialization=cs.wrap_serializer_function_ser_schema(self.wrap_serializer),
         )
 
-        return schema
+    def serialize(self, v: t.Any) -> t.Any:
+        return v
 
-    def serialize(self, v: t.Any, handler: "SerializerFunctionWrapHandler") -> t.Any:
+    def wrap_serializer(
+        self, v: t.Any, handler: "SerializerFunctionWrapHandler"
+    ) -> t.Any:
         v = handler(v)
+
+        v = self.serialize(v)
 
         if self.serializer:
             v = self.serializer(v)
@@ -154,9 +157,7 @@ class BaseConstraints:
 
 
 @dataclass
-class StringConstraints:
-    mode: Mode = "python"
-    has_default: bool = False
+class StringConstraints(BaseConstraints):
     pattern: Pattern | None = None
 
     def __get_pydantic_core_schema__(
@@ -179,15 +180,7 @@ class StringConstraints:
             ),
         )
 
-        schema = cs.no_info_before_validator_function(
-            (coerce_nonish_to_default if self.has_default else coerce_nonish_to_none),
-            schema,
-            serialization=cs.plain_serializer_function_ser_schema(
-                serialize_none_to_empty_str
-            ),
-        )
-
-        return schema
+        return self.apply_base_schema(schema)
 
     def pattern_error_wrapper(self, v: str, handler: t.Any):
         """
@@ -214,8 +207,9 @@ FORBIDDEN_PASSWORD_CHARS = r"{}"
 
 
 @dataclass
-class PasswordConstraints:
-    mode: Mode = "python"
+class PasswordConstraints(BaseConstraints):
+    has_default: t.Literal[False] = False
+    redact: t.Literal[True] = True
     forbidden_chars: str = FORBIDDEN_PASSWORD_CHARS
 
     def __get_pydantic_core_schema__(
@@ -240,15 +234,7 @@ class PasswordConstraints:
             )
         )
 
-        schema = cs.no_info_before_validator_function(
-            coerce_nonish_to_none,
-            schema,
-            serialization=cs.plain_serializer_function_ser_schema(
-                serialize_none_to_empty_str
-            ),
-        )
-
-        return schema
+        return self.apply_base_schema(schema)
 
     def validate(self, v: str) -> str:
         if any(char in v for char in (self.forbidden_chars)):
@@ -273,9 +259,7 @@ class PasswordConstraints:
 
 
 @dataclass
-class NumberConstraints:
-    mode: Mode = "python"
-    has_default: bool = False
+class NumberConstraints(BaseConstraints):
     min: int | None = None
     max: int | None = None
     step: int | None = None
@@ -306,9 +290,7 @@ class NumberConstraints:
 
 
 @dataclass
-class BooleanConstraints:
-    mode: Mode = "python"
-    has_default: bool = False
+class BooleanConstraints(BaseConstraints):
     serialization: tuple[int, int] | tuple[bool, bool] | tuple[str, str] = (True, False)
 
     def __get_pydantic_core_schema__(
@@ -342,9 +324,7 @@ class BooleanConstraints:
 
 
 @dataclass
-class DatetimeConstraints:
-    mode: Mode = "python"
-    has_default: bool = False
+class DatetimeConstraints(BaseConstraints):
 
     def __get_pydantic_core_schema__(
         self, source_type: t.Any, handler: "GetCoreSchemaHandler"
@@ -392,9 +372,7 @@ class DatetimeConstraints:
 
 
 @dataclass
-class PathConstraints:
-    mode: Mode = "python"
-    has_default: bool = False
+class PathConstraints(BaseConstraints):
     type: t.Literal["webpath"] = "webpath"
 
     def __get_pydantic_core_schema__(
@@ -439,9 +417,7 @@ UPLOAD_DIRS = set()
 
 
 @dataclass
-class FileConstraints:
-    mode: Mode = "python"
-    has_default: bool = False
+class FileConstraints(BaseConstraints):
     bind: str | None = None
     accept: list[str] | None = None
 
@@ -456,15 +432,8 @@ class FileConstraints:
                 cs.str_schema(),
             )
         )
-        schema = cs.no_info_before_validator_function(
-            (coerce_nonish_to_default if self.has_default else coerce_nonish_to_none),
-            schema,
-            serialization=cs.plain_serializer_function_ser_schema(
-                serialize_none_to_empty_str,
-            ),
-        )
 
-        return schema
+        return self.apply_base_schema(schema)
 
     def _base_parse_file(self, v: str) -> tuple[bytes, str | None]:
         import mimetypes

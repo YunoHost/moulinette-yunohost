@@ -81,7 +81,6 @@ from yunohost.utils.validation import (
     coerce_comalist_to_list,
     coerce_nonish_to_none,
     redact,
-    serialize_list_to_comalist,
 )
 
 if TYPE_CHECKING:
