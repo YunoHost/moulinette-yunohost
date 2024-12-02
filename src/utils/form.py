@@ -1477,7 +1477,7 @@ class DomainOption(BaseSelectOption):
 
     @model_validator(mode="before")
     @classmethod
-    def inject_domains_choices(cls, values: Values) -> Values:
+    def inject_choices_and_default(cls, values: Values) -> Values:
         # TODO remove calls to resources in validators (pydantic V2 should adress this)
         from yunohost.domain import domain_list
 
@@ -1487,15 +1487,9 @@ class DomainOption(BaseSelectOption):
             for domain in data["domains"]
         }
 
-        return values
+        if not values.get("multiple"):
+            values["default"] = data["main"]
 
-    @model_validator(mode="before")
-    @classmethod
-    def inject_default(cls, values: Values) -> Values:
-        # TODO remove calls to resources in validators (pydantic V2 should adress this)
-        from yunohost.domain import _get_maindomain
-
-        values["default"] = _get_maindomain()
         return values
 
     @staticmethod
@@ -1534,7 +1528,7 @@ class AppOption(BaseSelectOption):
 
     @model_validator(mode="before")
     @classmethod
-    def inject_apps_choices(cls, values: Values) -> Values:
+    def inject_choices(cls, values: Values) -> Values:
         # TODO remove calls to resources in validators (pydantic V2 should adress this)
         from yunohost.app import app_list
 
@@ -1579,7 +1573,7 @@ class UserOption(BaseSelectOption):
     choices: dict[str, str]
 
     @model_validator(mode="before")
-    def inject_users_choices_and_default(cls, values: Values) -> Values:
+    def inject_choices_and_default(cls, values: Values) -> Values:
         # TODO remove calls to resources in validators (pydantic V2 should adress this)
         from yunohost.user import user_list
 
@@ -1598,7 +1592,7 @@ class UserOption(BaseSelectOption):
                 error="You should create a YunoHost user first.",
             )
 
-        if not values.get("default"):
+        if not values.get("default") and not values.get("multiple"):
             values["default"] = next(
                 username
                 for username, infos in users.items()
@@ -1634,7 +1628,7 @@ class GroupOption(BaseSelectOption):
 
     @model_validator(mode="before")
     @classmethod
-    def inject_groups_choices(cls, values: Values) -> Values:
+    def inject_choices_and_default(cls, values: Values) -> Values:
         # TODO remove calls to resources in validators (pydantic V2 should adress this)
         from yunohost.user import user_group_list
 
@@ -1654,14 +1648,10 @@ class GroupOption(BaseSelectOption):
             groupname: _human_readable_group(groupname) for groupname in groups
         }
 
-        return values
-
-    @model_validator(mode="before")
-    @classmethod
-    def inject_default(cls, values: Values) -> Values:
-        # FIXME do we really want to default to something all the time?
-        if values.get("default") in ("", None):
+        # FIXME do we really want to default to something all the time when not multiple?
+        if not values.get("default")  and not values.get("multiple"):
             values["default"] = "all_users"
+
         return values
 
 

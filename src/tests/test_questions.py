@@ -757,7 +757,7 @@ class TestText(BaseTest):
         *commons("one\none,two", output="one\none,two", raw_option={"multiple": True}),
         *commons(["one\none", "two"], output="one\none,two", raw_option={"multiple": True}),
         ([1, 2], "1,2", {"multiple": True}),
-        *all_fails([[]], [True], {}, [1], raw_option={"multiple": True}),
+        *all_fails([[]], [True], {}, raw_option={"multiple": True}),
         ("value,F12", FAIL, {"multiple": True, "pattern": {"regexp": r'^[A-F]\d\d$'}}),
         ("F12,A57", "F12,A57", {"multiple": True, "pattern": {"regexp": r'^[A-F]\d\d$'}}),
     ]
@@ -1650,7 +1650,7 @@ class TestDomain(BaseTest):
                 ("doesnt_exist.pouet", FAIL, {}),
                 ("fake.com", FAIL, {"choices": ["fake.com"]}),
                 # multiple
-                *nones(None, "", ",", ", , ", [], output=domains2[1], raw_option={"multiple": True}, fail_if_required=False),
+                *nones(None, "", ",", ", , ", [], output="", raw_option={"multiple": True}),
                 *commons(f"{domains1[0]}, {domains2[0]} ", output=f"{domains1[0]},{domains2[0]}", raw_option={"multiple": True}),
                 ("fake.com", FAIL, {"multiple": True, "choices": ["fake.com"]}),
                 *all_fails([[]], {}, [True], [1], raw_option={"multiple": True}),
@@ -1851,7 +1851,7 @@ class TestUser(BaseTest):
                 # readonly
                 (admin_username, YunohostError, {"readonly": True}),  # readonly is forbidden
                 # multiple
-                *nones(None, "", ",", ", , ", [], output=admin_username, raw_option={"multiple": True}, fail_if_required=False),
+                *nones(None, "", ",", ", , ", [], output="", raw_option={"multiple": True}),
                 *commons(f"{admin_username}, {regular_username} ", output=f"{admin_username},{regular_username}", raw_option={"multiple": True}),
                 ("fake_user", FAIL, {"multiple": True, "choices": ["fake_user"]}),
                 *all_fails([[]], {}, [True], [1], raw_option={"multiple": True}),
@@ -1932,7 +1932,7 @@ class TestGroup(BaseTest):
                 # readonly
                 ("admins", YunohostError, {"readonly": True}),  # readonly is forbidden
                 # multiple
-                *nones(None, "", ",", ", , ", [], output="all_users", raw_option={"multiple": True}, fail_if_required=False),
+                *nones(None, "", ",", ", , ", [], output="", raw_option={"multiple": True}),
                 *commons("admins, visitors ", output="admins,visitors", raw_option={"multiple": True}),
                 (["custom_group", "visitors"], "custom_group,visitors", {"multiple": True}),
                 ("fake_group", FAIL, {"multiple": True, "choices": ["fake_group"]}),
