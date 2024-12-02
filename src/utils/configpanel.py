@@ -23,7 +23,7 @@ from collections import OrderedDict
 from logging import getLogger
 from typing import TYPE_CHECKING, Any, Iterator, Literal, Sequence, Type, Union, cast
 
-from pydantic import BaseModel, Extra, validator
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from moulinette import Moulinette, m18n
 from moulinette.interfaces.cli import colorize
@@ -45,8 +45,11 @@ from yunohost.utils.form import (
 from yunohost.utils.i18n import _value_for_locale
 
 if TYPE_CHECKING:
-    from pydantic.fields import ModelField
+    from pydantic import GetJsonSchemaHandler
+    from pydantic.fields import ValidationInfo
+    from pydantic.json_schema import JsonSchemaValue
     from pydantic.typing import AbstractSetIntStr, MappingIntStrAny
+    from pydantic_core.core_schema import CoreSchema
 
     from yunohost.utils.form import FormModel, Hooks
     from yunohost.log import OperationLogger
@@ -126,14 +129,6 @@ class SectionModel(ContainerModel, OptionsModel):
     is_action_section: bool = False
     bind: str | None = None
 
-    class Config:
-        @staticmethod
-        def schema_extra(schema: dict[str, Any]) -> None:
-            del schema["properties"]["id"]
-            options = schema["properties"].pop("options")
-            del schema["required"]
-            schema["additionalProperties"] = options["items"]
-
     # Don't forget to pass arguments to super init
     def __init__(
         self,
@@ -161,6 +156,18 @@ class SectionModel(ContainerModel, OptionsModel):
             options=options,
             is_action_section=is_action_section,
         )
+
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls, core_schema: "CoreSchema", handler: "GetJsonSchemaHandler"
+    ) -> "JsonSchemaValue":
+        schema = handler(core_schema)
+        del schema["properties"]["id"]
+        options = schema["properties"].pop("options")
+        del schema["required"]
+        schema["additionalProperties"] = options["items"]
+
+        return schema
 
     def is_visible(self, context: dict[str, Any]) -> bool:
         if isinstance(self.visible, bool):
@@ -205,15 +212,9 @@ class PanelModel(ContainerModel):
     bind: str | None = None
     sections: list[SectionModel]
 
-    class Config:
-        extra = Extra.allow
-
-        @staticmethod
-        def schema_extra(schema: dict[str, Any]) -> None:
-            del schema["properties"]["id"]
-            del schema["properties"]["sections"]
-            del schema["required"]
-            schema["additionalProperties"] = {"$ref": "#/definitions/SectionModel"}
+    model_config = ConfigDict(
+        extra="allow",
+    )
 
     # Don't forget to pass arguments to super init
     def __init__(
@@ -229,6 +230,18 @@ class PanelModel(ContainerModel):
         super().__init__(  # type: ignore
             id=id, name=name, services=services, help=help, bind=bind, sections=sections
         )
+
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls, core_schema: "CoreSchema", handler: "GetJsonSchemaHandler"
+    ) -> "JsonSchemaValue":
+        schema = handler(core_schema)
+        del schema["properties"]["id"]
+        del schema["properties"]["sections"]
+        del schema["required"]
+        schema["additionalProperties"] = {"$ref": "#/definitions/SectionModel"}
+
+        return schema
 
     def translate(self, i18n_key: str | None = None) -> None:
         """
@@ -265,29 +278,10 @@ class ConfigPanelModel(BaseModel):
     i18n: str | None = None
     panels: list[PanelModel]
 
-    class Config:
-        arbitrary_types_allowed = True
-        extra = Extra.allow
-
-        @staticmethod
-        def schema_extra(schema: dict[str, Any]) -> None:
-            """Update the schema to the expected input
-            In actual TOML definition, schema is like:
-            ```toml
-            [panel_1]
-                [panel_1.section_1]
-                    [panel_1.section_1.option_1]
-            ```
-            Which is equivalent to `{"panel_1": {"section_1": {"option_1": {}}}}`
-            so `section_id` (and `option_id`) are additional property of `panel_id`,
-            which is convinient to write but not ideal to iterate.
-            In ConfigPanelModel we gather additional properties of panels, sections
-            and options as lists so that structure looks like:
-            `{"panels`: [{"id": "panel_1", "sections": [{"id": "section_1", "options": [{"id": "option_1"}]}]}]
-            """
-            del schema["properties"]["panels"]
-            del schema["required"]
-            schema["additionalProperties"] = {"$ref": "#/definitions/PanelModel"}
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        extra="allow",
+    )
 
     # Don't forget to pass arguments to super init
     def __init__(
@@ -298,6 +292,31 @@ class ConfigPanelModel(BaseModel):
     ) -> None:
         panels = [data | {"id": name} for name, data in kwargs.items()]
         super().__init__(version=version, i18n=i18n, panels=panels)
+
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls, core_schema: "CoreSchema", handler: "GetJsonSchemaHandler"
+    ) -> "JsonSchemaValue":
+        """Update the schema to the expected input
+        In actual TOML definition, schema is like:
+        ```toml
+        [panel_1]
+            [panel_1.section_1]
+                [panel_1.section_1.option_1]
+        ```
+        Which is equivalent to `{"panel_1": {"section_1": {"option_1": {}}}}`
+        so `section_id` (and `option_id`) are additional property of `panel_id`,
+        which is convinient to write but not ideal to iterate.
+        In ConfigPanelModel we gather additional properties of panels, sections
+        and options as lists so that structure looks like:
+        `{"panels`: [{"id": "panel_1", "sections": [{"id": "section_1", "options": [{"id": "option_1"}]}]}]
+        """
+        schema = handler(core_schema)
+        del schema["properties"]["panels"]
+        del schema["required"]
+        schema["additionalProperties"] = {"$ref": "#/definitions/PanelModel"}
+
+        return schema
 
     @property
     def sections(self) -> Iterator[SectionModel]:
@@ -369,8 +388,9 @@ class ConfigPanelModel(BaseModel):
         for panel in self.panels:
             panel.translate(self.i18n)
 
-    @validator("version", always=True)
-    def check_version(cls, value: float, field: "ModelField") -> float:
+    @field_validator("version")
+    @classmethod
+    def check_version(cls, value: float, info: "ValidationInfo") -> float:
         if value < CONFIG_PANEL_VERSION_SUPPORTED:
             raise ValueError(
                 f"Config panels version '{value}' are no longer supported."
@@ -497,7 +517,7 @@ class ConfigPanel:
         logger.debug(f"Formating result in '{mode}' mode")
 
         if mode == "full":
-            result = self.config.dict(exclude_none=True)
+            result = self.config.model_dump(exclude_none=True)
 
             for panel in result["panels"]:
                 for section in panel["sections"]:
@@ -569,7 +589,7 @@ class ConfigPanel:
 
         self.config, self.form = self._get_config_panel()
         # FIXME find a better way to exclude previous settings
-        previous_settings = self.form.dict()
+        previous_settings = self.form.model_dump()
 
         # FIXME Not sure if this is need (redact call to operation logger does it on all the instances)
         # BaseOption.operation_logger = operation_logger
@@ -721,7 +741,7 @@ class ConfigPanel:
         ) -> "RawConfig":
             # filter in keys defined in model, filter out panels/sections/options that aren't `key`
             return OrderedDict(
-                {k: v for k, v in data.items() if k in model.__fields__ or k == key}
+                {k: v for k, v in data.items() if k in model.model_fields or k == key}
             )
 
         raw_config = self._get_raw_config()
@@ -807,7 +827,7 @@ class ConfigPanel:
         settings = (
             Settings(**raw_settings)
             if prevalidate
-            else Settings.construct(**raw_settings)
+            else Settings.model_construct(**raw_settings)
         )
 
         try:
@@ -839,7 +859,7 @@ class ConfigPanel:
         for panel in config.panels:
             if interactive and verbose:
                 Moulinette.display(
-                    colorize(f"\n{'='*40}\n>>>> {panel.name}\n{'='*40}", "purple")
+                    colorize(f"\n{'=' * 40}\n>>>> {panel.name}\n{'=' * 40}", "purple")
                 )
 
             # A section or option may only evaluate its conditions (`visible`
@@ -895,9 +915,9 @@ class ConfigPanel:
 
         exclude_defaults = self.save_mode == "diff"
         # get settings keys filtered by filter_key
-        partial_settings_keys = form.__fields__.keys()
+        partial_settings_keys = form.model_fields.keys()
         # get filtered settings
-        partial_settings = form.dict(exclude_defaults=exclude_defaults, exclude=exclude)  # type: ignore
+        partial_settings = form.model_dump(exclude_defaults=exclude_defaults, exclude=exclude)  # type: ignore
         # get previous settings that we will updated with new settings
         current_settings = self.raw_settings.copy()
 

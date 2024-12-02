@@ -1490,7 +1490,7 @@ class DatabaseAppResource(AppResource):
 
     def db_exists(self, db_name):
         if self.dbtype == "mysql":
-            return os.system(f"mysqlshow | grep -q -w '{db_name}' 2>/dev/null") == 0
+            return os.system(f"mariadb-show | grep -q -w '{db_name}' 2>/dev/null") == 0
         elif self.dbtype == "postgresql":
             return (
                 os.system(

@@ -661,8 +661,8 @@ class TestString(BaseTest):
     scenarios = [
         *nones(None, "", output=""),
         # basic typed values
-        (False, "False"),
-        (True, "True"),
+        (False, FAIL),
+        (True, FAIL),
         (0, "0"),
         (1, "1"),
         (-1, "-1"),
@@ -702,8 +702,8 @@ class TestText(BaseTest):
     scenarios = [
         *nones(None, "", output=""),
         # basic typed values
-        (False, "False"),
-        (True, "True"),
+        (False, FAIL),
+        (True, FAIL),
         (0, "0"),
         (1, "1"),
         (-1, "-1"),
@@ -743,14 +743,11 @@ class TestPassword(BaseTest):
     }
     # fmt: off
     scenarios = [
-        *all_fails(False, True, 0, 1, -1, 1337, 13.37, raw_option={"optional": True}),
-        *all_fails([], ["one"], {}, raw_option={"optional": True}, error=AttributeError),  # FIXME those fails with AttributeError
+        *all_fails(False, True, 0, 1, -1, 1337, 13.37, [], ["one"], {}, raw_option={"optional": True}),
         *all_fails("none", "_none", "False", "True", "0", "1", "-1", "1337", "13.37", "[]", ",", "['one']", "one,two", r"{}", "value", "value\n", raw_option={"optional": True}),
         *nones(None, "", output=""),
         ("s3cr3t!!", YunohostError, {"default": "SUPAs3cr3t!!"}),  # default is forbidden
-        *xpass(scenarios=[
-            ("s3cr3t!!", "s3cr3t!!", {"example": "SUPAs3cr3t!!"}),  # example is forbidden
-        ], reason="Should fail; example is forbidden"),
+        ("s3cr3t!!", YunohostError, {"example": "SUPAs3cr3t!!"}),  # example is forbidden
         *xpass(scenarios=[
             (" value \n moarc0mpl1cat3d\n  ", "value \n moarc0mpl1cat3d"),
             (" some_ value", "some_ value"),
@@ -970,17 +967,17 @@ class TestTime(BaseTest):
         # 1337 seconds == 22 minutes
         *all_as(1337, "1337", output="00:22"),
         # Negative timestamp fails
-        *all_fails(-1, "-1", error=OverflowError),  # FIXME should handle that as a validation error
+        *all_fails(-1, "-1"),
         # *all_fails(False, True, 0, 1, -1, 1337, 13.37, [], ["one"], {}, raw_option={"optional": True}),
         *all_fails("none", "_none", "False", "True", "[]", ",", "['one']", "one,two", r"{}", "value", "value\n", raw_option={"optional": True}),
         *nones(None, "", output=""),
         # custom valid
         *unchanged("00:00", "08:00", "12:19", "20:59", "23:59"),
-        ("3:00", "03:00"),
-        ("23:1", "23:01"),
         ("22:35:05", "22:35"),
         ("22:35:03.514", "22:35"),
         # custom invalid
+        ("3:00", FAIL),
+        ("23:1", FAIL),
         ("24:00", FAIL),
         ("23:005", FAIL),
         # readonly
@@ -1021,16 +1018,16 @@ class TestEmail(BaseTest):
             "राम@मोहन.ईन्फो",
             "юзер@екзампл.ком",
             "θσερ@εχαμπλε.ψομ",
-            "葉士豪@臺網中心.tw",
             "jeff@臺網中心.tw",
-            "葉士豪@臺網中心.台灣",
-            "jeff葉@臺網中心.tw",
             "ñoñó@example.tld",
             "甲斐黒川日本@example.tld",
             "чебурашкаящик-с-апельсинами.рф@example.tld",
             "उदाहरण.परीक्ष@domain.with.idn.tld",
             "ιωάννης@εεττ.gr",
         ),
+        ("葉士豪@臺網中心.tw", "葉士豪@臺網中心.tw"),
+        ("jeff葉@臺網中心.tw", "jeff葉@臺網中心.tw"),
+        ("葉士豪@臺網中心.台灣", "葉士豪@臺網中心.台灣"),
         # invalid email (Hiding because our current regex is very permissive)
         *all_fails(
             "my@localhost",
@@ -1148,22 +1145,17 @@ class TestUrl(BaseTest):
 
         *nones(None, "", output=""),
         ("http://some.org/folder/file.txt", "http://some.org/folder/file.txt"),
-        ('  https://www.example.com \n', 'https://www.example.com'),
+        ('  https://www.example.com \n', 'https://www.example.com/'),
         # readonly
         ("https://overwrite.org", "https://example.org", {"readonly": True, "default": "https://example.org"}),
         # rest is taken from https://github.com/pydantic/pydantic/blob/main/tests/test_networks.py
         # valid
         *unchanged(
             # Those are valid but not sure how they will output with pydantic
-            'http://example.org',
             'https://example.org/whatever/next/',
-            'https://example.org',
-
             'https://foo_bar.example.com/',
-            'http://example.co.jp',
             'http://www.example.com/a%C2%B1b',
             'http://www.example.com/~username/',
-            'http://info.example.com?fred',
             'http://info.example.com/?fred',
             'http://xn--mgbh0fb.xn--kgbechtv/',
             'http://example.com/blue/red%3Fand+green',
@@ -1171,13 +1163,8 @@ class TestUrl(BaseTest):
             'http://xn--rsum-bpad.example.org/',
             'http://123.45.67.8/',
             'http://123.45.67.8:8329/',
-            'http://[2001:db8::ff00:42]:8329',
-            'http://[2001::1]:8329',
             'http://[2001:db8::1]/',
             'http://www.example.com:8000/foo',
-            'http://www.cwi.nl:80/%7Eguido/Python.html',
-            'https://www.python.org/путь',
-            'http://андрей@example.com',
             'https://exam_ple.com/',
             'http://twitter.com/@handle/',
             'http://11.11.11.11.example.com/action',
@@ -1188,25 +1175,36 @@ class TestUrl(BaseTest):
             'http://example.org/path?query#fragment',
             'https://foo_bar.example.com/',
             'https://exam_ple.com/',
-            'HTTP://EXAMPLE.ORG',
-            'https://example.org',
-            'https://example.org?a=1&b=2',
-            'https://example.org#a=3;b=3',
-            'https://example.xn--p1ai',
-            'https://example.xn--vermgensberatung-pwb',
-            'https://example.xn--zfr164b',
+            'http://localhost/',
+            'http://localhost:8000/',
+            'http://example/#',
+            'http://example/#fragment',
+            'http://example/?#',
         ),
-        *xfail(scenarios=[
-            ('http://test', 'http://test'),
-            ('http://localhost', 'http://localhost'),
-            ('http://localhost/', 'http://localhost/'),
-            ('http://localhost:8000', 'http://localhost:8000'),
-            ('http://localhost:8000/', 'http://localhost:8000/'),
-            ('http://example#', 'http://example#'),
-            ('http://example/#', 'http://example/#'),
-            ('http://example/#fragment', 'http://example/#fragment'),
-            ('http://example/?#', 'http://example/?#'),
-        ], reason="Should this be valid?"),
+        *[
+            (url, url + '/')
+            for url in [
+                'http://example.org',
+                'https://example.org',
+                'http://example.co.jp',
+                'http://[2001:db8::ff00:42]:8329',
+                'http://[2001::1]:8329',
+                'https://example.xn--p1ai',
+                'https://example.xn--vermgensberatung-pwb',
+                'https://example.xn--zfr164b',
+                'http://test',
+                'http://localhost',
+                'http://localhost:8000'
+            ]
+        ],
+        ('http://info.example.com?fred', 'http://info.example.com/?fred'),
+        ('http://example#', 'http://example/#'),
+        ('HTTP://EXAMPLE.ORG', 'http://example.org/'),
+        ('https://example.org?a=1&b=2', 'https://example.org/?a=1&b=2'),
+        ('https://example.org#a=3;b=3', 'https://example.org/#a=3;b=3'),
+        ('http://www.cwi.nl:80/%7Eguido/Python.html', 'http://www.cwi.nl/%7Eguido/Python.html'),
+        ('https://www.python.org/путь', 'https://www.python.org/%D0%BF%D1%83%D1%82%D1%8C'),
+        ('http://андрей@example.com', 'http://%D0%B0%D0%BD%D0%B4%D1%80%D0%B5%D0%B9@example.com/'),
         # invalid
         *all_fails(
             'ftp://example.com/',
@@ -1409,7 +1407,6 @@ class TestSelect(BaseTest):
         },
         {
             "raw_options": [
-                {"choices": {-1: "verbose -one", 0: "verbose zero", 1: "verbose one", 10: "verbose ten"}},
                 {"choices": {"-1": "verbose -one", "0": "verbose zero", "1": "verbose one", "10": "verbose ten"}},
             ],
             "scenarios": [
@@ -1419,9 +1416,20 @@ class TestSelect(BaseTest):
                 *all_fails("100", 100),
             ]
         },
+        {
+            "raw_options": [
+                {"choices": {-1: "verbose -one", 0: "verbose zero", 1: "verbose one", 10: "verbose ten"}},
+            ],
+            "scenarios": [
+                *nones(None, "", output=""),
+                *unchanged(-1, 0, 1, 10), 
+                *all_fails("-1", "0", "1", "10"),
+                *all_fails("100", 100),
+            ]
+        },
         # [True, False, None]
         *unchanged(True, False, raw_option={"choices": [True, False, None]}),  # FIXME we should probably forbid None in choices
-        (None, FAIL, {"choices": [True, False, None]}),
+        (None, "", {"choices": [True, False, None]}),
         {
             # mixed types
             "raw_options": [{"choices": ["one", 2, True]}],
@@ -1438,7 +1446,7 @@ class TestSelect(BaseTest):
             "raw_options": [{"choices": ""}, {"choices": []}],
             "scenarios": [
                 # FIXME those should fail at option level (wrong default, dev error)
-                *all_fails(None, ""),
+                *all_fails(None, "", error=YunohostError),
                 *xpass(scenarios=[
                     ("", "", {"optional": True}),
                     (None, "", {"optional": True}),
@@ -1891,7 +1899,7 @@ def test_options_query_string():
         "time_id": "20:55",
         "email_id": "coucou@ynh.org",
         "path_id": "/ynh-dev",
-        "url_id": "https://yunohost.org",
+        "url_id": "https://yunohost.org/",
         "file_id": file_content1,
         "select_id": "one",
         "tags_id": "one,two",

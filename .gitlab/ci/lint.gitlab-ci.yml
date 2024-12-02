@@ -11,27 +11,27 @@ actionsmap:
     - python3 -c 'import yaml; yaml.safe_load(open("share/actionsmap.yml"))'
     - python3 -c 'import yaml; yaml.safe_load(open("share/actionsmap-portal.yml"))'
 
-lint311:
+lint312:
   stage: lint
   image: "build-and-lint"
   needs: []
   allow_failure: true
   script:
-    - tox -e py311-lint
+    - tox -e py312-lint
 
-invalidcode311:
+invalidcode312:
   stage: lint
   image: "build-and-lint"
   needs: []
   script:
-    - tox -e py311-invalidcode
+    - tox -e py312-invalidcode
 
 mypy:
   stage: lint
   image: "build-and-lint"
   needs: []
   script:
-    - tox -e py311-mypy
+    - tox -e py312-mypy
 
 i18n-keys:
   stage: lint

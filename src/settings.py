@@ -160,7 +160,7 @@ class SettingsConfigPanel(ConfigPanel):
         self.config, self.form = self._get_config_panel(prevalidate=True)
 
         # FIXME find a better way to exclude previous settings
-        previous_settings = self.form.dict()
+        previous_settings = self.form.model_dump()
 
         for option in self.config.options:
             if not option.readonly and (
@@ -250,7 +250,7 @@ class SettingsConfigPanel(ConfigPanel):
         super()._apply(form, config, previous_settings, exclude=self.virtual_settings)
         next_settings = {
             k: v
-            for k, v in form.dict(exclude=self.virtual_settings).items()
+            for k, v in form.model_dump(exclude=self.virtual_settings).items()
             if previous_settings.get(k) != v
         }
 

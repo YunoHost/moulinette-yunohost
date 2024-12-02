@@ -2,7 +2,7 @@
   stage: build
   needs:
     - job: actionsmap
-    - job: invalidcode311
+    - job: invalidcode312
   image: "build-and-lint"
   variables:
     YNH_BUILD_DIR: "$GIT_CLONE_PATH/build"

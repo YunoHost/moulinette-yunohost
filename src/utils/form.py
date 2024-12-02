@@ -42,16 +42,16 @@ from typing import (
 
 from pydantic import (
     BaseModel,
-    Extra,
+    ConfigDict,
     ValidationError,
     create_model,
-    validator,
-    root_validator,
+    field_validator,
+    model_validator,
 )
-from pydantic.color import Color
 from pydantic.fields import Field
-from pydantic.networks import EmailStr, HttpUrl
+from pydantic.networks import EmailStr, HttpUrl, Url
 from pydantic.types import constr
+from pydantic_extra_types.color import Color
 
 from moulinette import Moulinette, m18n
 from moulinette.interfaces.cli import colorize
@@ -61,7 +61,10 @@ from yunohost.utils.error import YunohostError, YunohostValidationError
 from yunohost.utils.i18n import _value_for_locale
 
 if TYPE_CHECKING:
-    from pydantic.fields import ModelField, FieldInfo
+    from pydantic import GetJsonSchemaHandler
+    from pydantic.fields import ValidationInfo, FieldInfo
+    from pydantic.json_schema import JsonSchemaValue
+    from pydantic_core.core_schema import CoreSchema
 
 logger = getLogger("yunohost.form")
 
@@ -375,49 +378,58 @@ class BaseOption(BaseModel):
     mode: Mode = (
         "bash"  # TODO use "python" as default mode with AppConfigPanel setuping it to "bash"
     )
-    ask: Translation | None
+    ask: Translation | None = None
     readonly: bool = False
     visible: JSExpression | bool = True
     bind: str | None = None
     name: str | None = None  # LEGACY (replaced by `id`)
 
-    class Config:
-        arbitrary_types_allowed = True
-        use_enum_values = True
-        validate_assignment = True
-        extra = Extra.forbid
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        use_enum_values=True,
+        validate_assignment=True,
+        extra="forbid",
+    )
 
-        @staticmethod
-        def schema_extra(schema: dict[str, Any]) -> None:
-            del schema["properties"]["id"]
-            del schema["properties"]["name"]
-            schema["required"] = [
-                required for required in schema.get("required", []) if required != "id"
-            ]
-            if not schema["required"]:
-                del schema["required"]
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls, core_schema: "CoreSchema", handler: "GetJsonSchemaHandler"
+    ) -> "JsonSchemaValue":
+        schema = handler(core_schema)
+        del schema["properties"]["id"]
+        del schema["properties"]["name"]
+        schema["required"] = [
+            required for required in schema.get("required", []) if required != "id"
+        ]
+        if not schema["required"]:
+            del schema["required"]
 
-    @validator("id", pre=True)
+        return schema
+
+    @field_validator("id", mode="before")
+    @classmethod
     def check_id_is_not_forbidden(cls, value: str) -> str:
         if value in FORBIDDEN_KEYWORDS:
             raise ValueError(m18n.n("config_forbidden_keyword", keyword=value))
         return value
 
     # FIXME Legacy, is `name` still needed?
-    @validator("name")
-    def apply_legacy_name(cls, value: str | None, values: Values) -> str:
+    @field_validator("name")
+    @classmethod
+    def apply_legacy_name(cls, value: str | None, info: "ValidationInfo") -> str:
         if value is None:
-            return values["id"]
+            return info.data["id"]
         return value
 
-    @validator("readonly", pre=True)
-    def can_be_readonly(cls, value: bool, values: Values) -> bool:
-        if value is True and values["type"] in FORBIDDEN_READONLY_TYPES:
+    @field_validator("readonly", mode="before")
+    @classmethod
+    def can_be_readonly(cls, value: bool, info: "ValidationInfo") -> bool:
+        if value is True and info.data["type"] in FORBIDDEN_READONLY_TYPES:
             raise ValueError(
                 m18n.n(
                     "config_forbidden_readonly_type",
-                    type=values["type"],
-                    id=values["id"],
+                    type=info.data["type"],
+                    id=info.data["id"],
                 )
             )
         return value
@@ -617,8 +629,9 @@ class BaseInputOption(BaseOption):
     _annotation: Any = Any
     _none_as_empty_str: ClassVar[bool] = True
 
-    @validator("default", pre=True)
-    def check_empty_default(value: Any) -> Any:
+    @field_validator("default", mode="before")
+    @classmethod
+    def check_empty_default(cls, value: Any) -> Any:
         if value == "":
             return None
         return value
@@ -653,26 +666,27 @@ class BaseInputOption(BaseOption):
     def _get_field_attrs(self) -> dict[str, Any]:
         """
         Returns attributes to build a `pydantic.Field`.
-        This may contains non `Field` attrs that will end up in `Field.extra`.
-        Those extra can be used as constraints in custom validators and ends up
+        Extra can be used as constraints in custom validators and ends up
         in the JSON Schema.
         """
         # TODO
         # - help
         # - placeholder
-        attrs: dict[str, Any] = {
+        attrs: dict[str, Any] = {}
+        attrs["json_schema_extra"] = {
             "redact": self.redact,  # extra
             "none_as_empty_str": self._none_as_empty_str,
         }
 
         if self.readonly:
-            attrs["allow_mutation"] = False
+            attrs["frozen"] = True
 
         if self.example:
             attrs["examples"] = [self.example]
 
         if self.default is not None:
             attrs["default"] = self.default
+            attrs["validate_default"] = True
         else:
             attrs["default"] = ... if not self.optional else None
 
@@ -702,16 +716,16 @@ class BaseInputOption(BaseOption):
 
         return message
 
-    @classmethod
-    def _value_pre_validator(cls, value: Any, field: "ModelField") -> Any:
+    @staticmethod
+    def _value_pre_validator(cls, value: Any, info: "ValidationInfo") -> Any:
         if value == "":
             return None
 
         return value
 
-    @classmethod
-    def _value_post_validator(cls, value: Any, field: "ModelField") -> Any:
-        extras = field.field_info.extra
+    @staticmethod
+    def _value_post_validator(cls, value: Any, info: "ValidationInfo") -> Any:
+        extras = cls.model_fields[info.field_name].json_schema_extra
 
         if value is None and extras["none_as_empty_str"]:
             value = ""
@@ -749,7 +763,7 @@ class BaseStringOption(BaseInputOption):
     @property
     def _dynamic_annotation(self) -> Type[str]:
         if self.pattern:
-            return constr(regex=self.pattern.regexp)
+            return constr(pattern=self.pattern.regexp)
 
         return self._annotation
 
@@ -757,7 +771,7 @@ class BaseStringOption(BaseInputOption):
         attrs = super()._get_field_attrs()
 
         if self.pattern:
-            attrs["regex_error"] = self.pattern.error  # extra
+            attrs["json_schema_extra"]["regex_error"] = self.pattern.error  # extra
 
         return attrs
 
@@ -834,16 +848,23 @@ class PasswordOption(BaseInputOption):
     def _get_field_attrs(self) -> dict[str, Any]:
         attrs = super()._get_field_attrs()
 
-        attrs["forbidden_chars"] = self._forbidden_chars  # extra
+        attrs["json_schema_extra"]["forbidden_chars"] = self._forbidden_chars  # extra
 
         return attrs
 
-    @classmethod
-    def _value_pre_validator(cls, value: str | None, field: "ModelField") -> str | None:
-        value = super()._value_pre_validator(value, field)
+    @staticmethod
+    def _value_pre_validator(
+        cls, value: str | None, info: "ValidationInfo"
+    ) -> str | None:
+        value = super(PasswordOption, PasswordOption)._value_pre_validator(
+            cls, value, info
+        )
 
         if value is not None and value != "":
-            forbidden_chars: str = field.field_info.extra["forbidden_chars"]
+            value = str(value)
+            forbidden_chars: str = cls.model_fields[info.field_name].json_schema_extra[
+                "forbidden_chars"
+            ]
             if any(char in value for char in forbidden_chars):
                 raise YunohostValidationError(
                     "pattern_password_app", forbidden_chars=forbidden_chars
@@ -891,14 +912,14 @@ class ColorOption(BaseInputOption):
 
         return super(ColorOption, ColorOption).normalize(value, option)
 
-    @classmethod
+    @staticmethod
     def _value_post_validator(
-        cls, value: Color | None, field: "ModelField"
+        cls, value: Color | None, info: "ValidationInfo"
     ) -> str | None:
         if isinstance(value, Color):
             return value.as_hex()
 
-        return super()._value_post_validator(value, field)
+        return super(ColorOption, ColorOption)._value_post_validator(cls, value, info)
 
 
 # ─ NUMERIC ───────────────────────────────────────────────
@@ -948,7 +969,7 @@ class NumberOption(BaseInputOption):
         if value in [None, ""]:
             return None
 
-        option = option.dict() if isinstance(option, BaseOption) else option
+        option = option.model_dump() if isinstance(option, BaseOption) else option
         raise YunohostValidationError(
             "app_argument_invalid",
             name=option.get("id"),
@@ -959,13 +980,15 @@ class NumberOption(BaseInputOption):
         attrs = super()._get_field_attrs()
         attrs["ge"] = self.min
         attrs["le"] = self.max
-        attrs["step"] = self.step  # extra
+        attrs["json_schema_extra"]["step"] = self.step  # extra
 
         return attrs
 
-    @classmethod
-    def _value_pre_validator(cls, value: int | None, field: "ModelField") -> int | None:
-        value = super()._value_pre_validator(value, field)
+    @staticmethod
+    def _value_pre_validator(
+        cls, value: int | None, info: "ValidationInfo"
+    ) -> int | None:
+        value = super(NumberOption, NumberOption)._value_pre_validator(cls, value, info)
 
         if value is None:
             return None
@@ -1009,7 +1032,7 @@ class BooleanOption(BaseInputOption):
 
     @staticmethod
     def humanize(value, option={}) -> str:
-        option = option.dict() if isinstance(option, BaseOption) else option
+        option = option.model_dump() if isinstance(option, BaseOption) else option
 
         yes = option.get("yes", 1)
         no = option.get("no", 0)
@@ -1032,7 +1055,7 @@ class BooleanOption(BaseInputOption):
 
     @staticmethod
     def normalize(value, option={}) -> Any:
-        option = option.dict() if isinstance(option, BaseOption) else option
+        option = option.model_dump() if isinstance(option, BaseOption) else option
 
         if isinstance(value, str):
             value = value.strip()
@@ -1075,7 +1098,7 @@ class BooleanOption(BaseInputOption):
 
     def _get_field_attrs(self) -> dict[str, Any]:
         attrs = super()._get_field_attrs()
-        attrs["parse"] = {  # extra
+        attrs["json_schema_extra"]["parse"] = {  # extra
             True: self.yes,
             False: self.no,
         }
@@ -1089,12 +1112,14 @@ class BooleanOption(BaseInputOption):
 
         return message
 
-    @classmethod
-    def _value_post_validator(cls, value: bool | None, field: "ModelField") -> Any:
+    @staticmethod
+    def _value_post_validator(cls, value: bool | None, info: "ValidationInfo") -> Any:
         if isinstance(value, bool):
-            return field.field_info.extra["parse"][value]
+            return cls.model_fields[info.field_name].json_schema_extra["parse"][value]
 
-        return super()._value_post_validator(value, field)
+        return super(BooleanOption, BooleanOption)._value_post_validator(
+            cls, value, info
+        )
 
 
 # ─ TIME ──────────────────────────────────────────────────
@@ -1122,14 +1147,27 @@ class DateOption(BaseInputOption):
     default: str | None = None
     _annotation = datetime.date
 
-    @classmethod
+    @staticmethod
+    def _value_pre_validator(
+        cls, v: datetime.date | str | None, info: "ValidationInfo"
+    ) -> datetime.date | str | None:
+        v = super(DateOption, DateOption)._value_pre_validator(cls, v, info)
+        if isinstance(v, int | float) or (
+            isinstance(v, str) and v.replace(".", "").replace("-", "", 1).isdigit()
+        ):
+            # FIXME use datetime.timezone.utc? or use local timezone
+            return datetime.date.fromtimestamp(float(v))
+
+        return v
+
+    @staticmethod
     def _value_post_validator(
-        cls, value: datetime.date | None, field: "ModelField"
+        cls, value: datetime.date | None, info: "ValidationInfo"
     ) -> str | None:
         if isinstance(value, datetime.date):
             return value.isoformat()
 
-        return super()._value_post_validator(value, field)
+        return super(DateOption, DateOption)._value_post_validator(cls, value, info)
 
 
 class TimeOption(BaseInputOption):
@@ -1152,15 +1190,29 @@ class TimeOption(BaseInputOption):
     default: str | int | None = None
     _annotation = datetime.time
 
-    @classmethod
+    @staticmethod
+    def _value_pre_validator(
+        cls, v: Any, info: "ValidationInfo"
+    ) -> datetime.time | datetime.datetime | None:
+        v = super(TimeOption, TimeOption)._value_pre_validator(cls, v, info)
+        if isinstance(v, int | float) or (
+            isinstance(v, str) and v.replace(".", "").replace("-", "", 1).isdigit()
+        ):
+            value = float(v)
+            if value >= 0:
+                return datetime.datetime.fromtimestamp(float(v)).time()
+
+        return v
+
+    @staticmethod
     def _value_post_validator(
-        cls, value: datetime.date | None, field: "ModelField"
+        cls, value: datetime.date | None, info: "ValidationInfo"
     ) -> str | None:
         if isinstance(value, datetime.time):
             # FIXME could use `value.isoformat()` to get `%H:%M:%S`
             return value.strftime("%H:%M")
 
-        return super()._value_post_validator(value, field)
+        return super(TimeOption, TimeOption)._value_post_validator(cls, value, info)
 
 
 # ─ LOCATIONS ─────────────────────────────────────────────
@@ -1206,7 +1258,7 @@ class WebPathOption(BaseStringOption):
 
     @staticmethod
     def normalize(value, option={}) -> str:
-        option = option.dict() if isinstance(option, BaseOption) else option
+        option = option.model_dump() if isinstance(option, BaseOption) else option
 
         if value is None:
             value = ""
@@ -1253,17 +1305,47 @@ class URLOption(BaseStringOption):
     type: Literal[OptionType.url] = OptionType.url
     _annotation = HttpUrl
 
-    @classmethod
+    @staticmethod
     def _value_post_validator(
-        cls, value: HttpUrl | None, field: "ModelField"
+        cls, value: HttpUrl | None, info: "ValidationInfo"
     ) -> str | None:
-        if isinstance(value, HttpUrl):
+        if isinstance(value, Url):
             return str(value)
 
-        return super()._value_post_validator(value, field)
+        return super(URLOption, URLOption)._value_post_validator(cls, value, info)
 
 
 # ─ FILE ──────────────────────────────────────────────────
+
+
+def _base_value_post_validator(
+    cls, value: Any, info: "ValidationInfo"
+) -> tuple[bytes, str | None]:
+    import mimetypes
+    from pathlib import Path
+    from magic import Magic
+    from base64 import b64decode
+
+    if Moulinette.interface.type != "api":
+        path = Path(value)
+        if not (path.exists() and path.is_absolute() and path.is_file()):
+            raise YunohostValidationError("File doesn't exists", raw_msg=True)
+        content = path.read_bytes()
+    else:
+        content = b64decode(value)
+
+    accept_list = cls.model_fields[info.field_name].json_schema_extra.get("accept")
+    mimetype = Magic(mime=True).from_buffer(content)
+
+    if accept_list and mimetype not in accept_list:
+        raise YunohostValidationError(
+            f"Unsupported file type '{mimetype}', expected a type among '{', '.join(accept_list)}'.",
+            raw_msg=True,
+        )
+
+    ext = mimetypes.guess_extension(mimetype)
+
+    return content, ext
 
 
 class FileOption(BaseInputOption):
@@ -1309,9 +1391,9 @@ class FileOption(BaseInputOption):
         attrs = super()._get_field_attrs()
 
         if self.accept:
-            attrs["accept"] = self.accept  # extra
+            attrs["json_schema_extra"]["accept"] = self.accept  # extra
 
-        attrs["bind"] = self.bind
+        attrs["json_schema_extra"]["bind"] = self.bind
 
         return attrs
 
@@ -1322,57 +1404,29 @@ class FileOption(BaseInputOption):
             if os.path.exists(upload_dir):
                 shutil.rmtree(upload_dir)
 
-    @classmethod
-    def _base_value_post_validator(
-        cls, value: Any, field: "ModelField"
-    ) -> tuple[bytes, str | None]:
-        import mimetypes
-        from pathlib import Path
-        from magic import Magic
-        from base64 import b64decode
-
-        if Moulinette.interface.type != "api":
-            path = Path(value)
-            if not (path.exists() and path.is_absolute() and path.is_file()):
-                raise YunohostValidationError("File doesn't exists", raw_msg=True)
-            content = path.read_bytes()
-        else:
-            content = b64decode(value)
-
-        accept_list = field.field_info.extra.get("accept")
-        mimetype = Magic(mime=True).from_buffer(content)
-
-        if accept_list and mimetype not in accept_list:
-            raise YunohostValidationError(
-                f"Unsupported file type '{mimetype}', expected a type among '{', '.join(accept_list)}'.",
-                raw_msg=True,
-            )
-
-        ext = mimetypes.guess_extension(mimetype)
-
-        return content, ext
-
-    @classmethod
-    def _bash_value_post_validator(cls, value: Any, field: "ModelField") -> str:
+    @staticmethod
+    def _bash_value_post_validator(cls, value: Any, info: "ValidationInfo") -> str:
         """File handling for "bash" config panels (app)"""
         if not value:
             return ""
 
-        content, _ = cls._base_value_post_validator(value, field)
+        content, _ = _base_value_post_validator(cls, value, info)
 
         upload_dir = tempfile.mkdtemp(prefix="ynh_filequestion_")
         _, file_path = tempfile.mkstemp(dir=upload_dir)
 
         FileOption._upload_dirs.add(upload_dir)
 
-        logger.debug(f"Saving file {field.name} for file question into {file_path}")
+        logger.debug(
+            f"Saving file {info.field_name} for file question into {file_path}"
+        )
 
         write_to_file(file_path, content, file_mode="wb")
 
         return file_path
 
-    @classmethod
-    def _python_value_post_validator(cls, value: Any, field: "ModelField") -> str:
+    @staticmethod
+    def _python_value_post_validator(cls, value: Any, info: "ValidationInfo") -> str:
         """File handling for "python" config panels"""
 
         from pathlib import Path
@@ -1381,7 +1435,7 @@ class FileOption(BaseInputOption):
         if not value:
             return ""
 
-        bind = field.field_info.extra["bind"]
+        bind = cls.model_fields[info.field_name].json_schema_extra["bind"]
 
         # to avoid "filename too long" with b64 content
         if len(value.encode("utf-8")) < 255:
@@ -1392,7 +1446,7 @@ class FileOption(BaseInputOption):
             ):
                 return value
 
-        content, ext = cls._base_value_post_validator(value, field)
+        content, ext = _base_value_post_validator(cls, value, info)
 
         m = hashlib.sha256()
         m.update(content)
@@ -1412,8 +1466,9 @@ class BaseChoicesOption(BaseInputOption):
     # We do not declare `choices` here to be able to declare other fields before `choices` and acces their values in `choices` validators
     # choices: dict[str, Any] | list[Any] | None
 
-    @validator("choices", pre=True, check_fields=False)
-    def parse_comalist_choices(value: Any) -> dict[str, Any] | list[Any] | None:
+    @field_validator("choices", mode="before", check_fields=False)
+    @classmethod
+    def parse_comalist_choices(cls, value: Any) -> dict[str, Any] | list[Any] | None:
         if isinstance(value, str):
             values = [value.strip() for value in value.split(",")]
             return [value for value in values if value]
@@ -1421,7 +1476,7 @@ class BaseChoicesOption(BaseInputOption):
 
     @property
     def _dynamic_annotation(self) -> object | Type[str]:
-        if self.choices is not None:
+        if self.choices:
             choices = (
                 self.choices if isinstance(self.choices, list) else self.choices.keys()
             )
@@ -1482,7 +1537,7 @@ class SelectOption(BaseChoicesOption):
 
     type: Literal[OptionType.select] = OptionType.select
     filter: Literal[None] = None
-    choices: list[Any] | dict[str, Any] | None
+    choices: list[Any] | dict[Any, Any] | None = None
     default: str | None = None
     _annotation = str
 
@@ -1549,7 +1604,7 @@ class TagsOption(BaseChoicesOption):
 
         # Repeat pattern stuff since we can't call the bare class `_dynamic_annotation` prop without instantiating it
         if self.pattern:
-            return constr(regex=self.pattern.regexp)
+            return constr(pattern=self.pattern.regexp)
 
         return self._annotation
 
@@ -1557,13 +1612,13 @@ class TagsOption(BaseChoicesOption):
         attrs = super()._get_field_attrs()
 
         if self.choices:
-            attrs["choices"] = self.choices  # extra
+            attrs["json_schema_extra"]["choices"] = self.choices  # extra
 
         return attrs
 
-    @classmethod
+    @staticmethod
     def _value_pre_validator(
-        cls, value: list | str | None, field: "ModelField"
+        cls, value: list | str | None, info: "ValidationInfo"
     ) -> str | None:
         if value is None or value == "":
             return None
@@ -1571,7 +1626,7 @@ class TagsOption(BaseChoicesOption):
         if not isinstance(value, (list, str, type(None))):
             raise YunohostValidationError(
                 "app_argument_invalid",
-                name=field.name,
+                name=info.field_name,
                 error=f"'{str(value)}' is not a list",
             )
 
@@ -1580,12 +1635,12 @@ class TagsOption(BaseChoicesOption):
             value = [v for v in value if v]
 
         if isinstance(value, list):
-            choices = field.field_info.extra.get("choices")
+            choices = cls.model_fields[info.field_name].json_schema_extra.get("choices")
             if choices:
                 if not all(v in choices for v in value):
                     raise YunohostValidationError(
                         "app_argument_choice_invalid",
-                        name=field.name,
+                        name=info.field_name,
                         value=value,
                         choices=", ".join(str(choice) for choice in choices),
                     )
@@ -1614,27 +1669,30 @@ class DomainOption(BaseChoicesOption):
 
     type: Literal[OptionType.domain] = OptionType.domain
     filter: Literal[None] = None
-    choices: dict[str, str] | None
+    choices: dict[str, str] | None = None
 
-    @validator("choices", pre=True, always=True)
-    def inject_domains_choices(
-        cls, value: dict[str, str] | None, values: Values
-    ) -> dict[str, str]:
+    @model_validator(mode="before")
+    @classmethod
+    def inject_domains_choices(cls, values: Values) -> Values:
         # TODO remove calls to resources in validators (pydantic V2 should adress this)
         from yunohost.domain import domain_list
 
         data = domain_list()
-        return {
+        values["choices"] = {
             domain: domain + " ★" if domain == data["main"] else domain
             for domain in data["domains"]
         }
 
-    @validator("default", pre=True, always=True)
-    def inject_default(cls, value: str | None, values: Values) -> str | None:
+        return values
+
+    @model_validator(mode="before")
+    @classmethod
+    def inject_default(cls, values: Values) -> Values:
         # TODO remove calls to resources in validators (pydantic V2 should adress this)
         from yunohost.domain import _get_maindomain
 
-        return _get_maindomain()
+        values["default"] = _get_maindomain()
+        return values
 
     @staticmethod
     def normalize(value, option={}) -> str:
@@ -1668,12 +1726,11 @@ class AppOption(BaseChoicesOption):
 
     type: Literal[OptionType.app] = OptionType.app
     filter: JSExpression | None = None
-    choices: dict[str, str] | None
+    choices: dict[str, str] | None = None
 
-    @validator("choices", pre=True, always=True)
-    def inject_apps_choices(
-        cls, value: dict[str, str] | None, values: Values
-    ) -> dict[str, str]:
+    @model_validator(mode="before")
+    @classmethod
+    def inject_apps_choices(cls, values: Values) -> Values:
         # TODO remove calls to resources in validators (pydantic V2 should adress this)
         from yunohost.app import app_list
 
@@ -1694,7 +1751,9 @@ class AppOption(BaseChoicesOption):
             }
         )
 
-        return value
+        values["choices"] = value
+
+        return values
 
 
 class UserOption(BaseChoicesOption):
@@ -1714,9 +1773,9 @@ class UserOption(BaseChoicesOption):
 
     type: Literal[OptionType.user] = OptionType.user
     filter: Literal[None] = None
-    choices: dict[str, str] | None
+    choices: dict[str, str] | None = None
 
-    @root_validator(pre=True)
+    @model_validator(mode="before")
     def inject_users_choices_and_default(cls, values: Values) -> Values:
         # TODO remove calls to resources in validators (pydantic V2 should adress this)
         from yunohost.user import user_list
@@ -1764,13 +1823,12 @@ class GroupOption(BaseChoicesOption):
 
     type: Literal[OptionType.group] = OptionType.group
     filter: Literal[None] = None
-    choices: dict[str, str] | None
+    choices: dict[str, str] | None = None
     default: Literal["visitors", "all_users", "admins"] | None = "all_users"
 
-    @validator("choices", pre=True, always=True)
-    def inject_groups_choices(
-        cls, value: dict[str, str] | None, values: Values
-    ) -> dict[str, str]:
+    @model_validator(mode="before")
+    @classmethod
+    def inject_groups_choices(cls, values: Values) -> Values:
         # TODO remove calls to resources in validators (pydantic V2 should adress this)
         from yunohost.user import user_group_list
 
@@ -1786,14 +1844,19 @@ class GroupOption(BaseChoicesOption):
                 else groupname
             )
 
-        return {groupname: _human_readable_group(groupname) for groupname in groups}
+        values["choices"] = {
+            groupname: _human_readable_group(groupname) for groupname in groups
+        }
 
-    @validator("default", pre=True, always=True)
-    def inject_default(cls, value: str | None, values: Values) -> str:
+        return values
+
+    @model_validator(mode="before")
+    @classmethod
+    def inject_default(cls, values: Values) -> Values:
         # FIXME do we really want to default to something all the time?
-        if value is None:
-            return "all_users"
-        return value
+        if values.get("default") in ("", None):
+            values["default"] = "all_users"
+        return values
 
 
 OPTIONS = {
@@ -1917,9 +1980,11 @@ class FormModel(BaseModel):
     Base form on which dynamic forms are built upon Options.
     """
 
-    class Config:
-        validate_assignment = True
-        extra = Extra.ignore
+    model_config = ConfigDict(
+        validate_assignment=True,
+        extra="ignore",
+        coerce_numbers_to_str=True,
+    )
 
     def __getitem__(self, name: str) -> Any:
         # FIXME
@@ -1950,7 +2015,7 @@ def build_form(
     """
     Returns a dynamic pydantic model class that can be used as a form.
     Parsing/validation occurs at instanciation and assignements.
-    To avoid validation at instanciation, use `my_form.construct(**values)`
+    To avoid validation at instanciation, use `my_form.model_construct(**values)`
     """
     options_as_fields: Any = {}
     validators: dict[str, Any] = {}
@@ -1963,8 +2028,8 @@ def build_form(
         option_validators = option._validators
 
         for step in ("pre", "post"):
-            validators[f"{option.id}_{step}_validator"] = validator(
-                option.id, allow_reuse=True, pre=step == "pre"
+            validators[f"{option.id}_{step}_validator"] = field_validator(
+                option.id, mode="before" if step == "pre" else "after"
             )(option_validators[step])
 
     return cast(
@@ -2124,13 +2189,16 @@ def prompt_or_validate_form(
                         )
                     if (
                         isinstance(option, (BaseStringOption, TagsOption))
-                        and "regex" in err["type"]
+                        and "pattern" in err["type"]
                         and option.pattern is not None
                     ):
                         err_text = option.pattern.error
                     else:
-                        err_text = m18n.n(
-                            f"pydantic.{err['type']}".replace(".", "_"), **ctx
+                        i18n_key = f"pydantic.{err['type']}".replace(".", "_")
+                        err_text = (
+                            m18n.n(i18n_key, **ctx)
+                            if m18n.key_exists(i18n_key)
+                            else err["msg"]
                         )
                 else:
                     err_text = str(e)
@@ -2202,7 +2270,7 @@ def ask_questions_and_parse_answers(
     model_options = parse_raw_options(raw_options, serialize=False)
     # Build the form from those questions and instantiate it without
     # parsing/validation (construct) since it may contains required questions.
-    form = build_form(model_options).construct()
+    form = build_form(model_options).model_construct()
     form = prompt_or_validate_form(
         model_options, form, prefilled_answers=answers, context=context, hooks=hooks
     )
@@ -2212,13 +2280,15 @@ def ask_questions_and_parse_answers(
 @overload
 def parse_raw_options(
     raw_options: dict[str, Any], serialize: Literal[True]
-) -> list[dict[str, Any]]: ...
+) -> list[dict[str, Any]]:
+    ...
 
 
 @overload
 def parse_raw_options(
     raw_options: dict[str, Any], serialize: Literal[False] = False
-) -> list[AnyOption]: ...
+) -> list[AnyOption]:
+    ...
 
 
 def parse_raw_options(
@@ -2233,6 +2303,6 @@ def parse_raw_options(
     model.translate_options()
 
     if serialize:
-        return model.dict()["options"]
+        return model.model_dump()["options"]
 
     return model.options

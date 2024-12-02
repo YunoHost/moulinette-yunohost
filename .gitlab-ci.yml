@@ -46,7 +46,7 @@ workflow:
 variables:
   GIT_CLONE_PATH: '$CI_BUILDS_DIR/$CI_COMMIT_SHA/$CI_JOB_ID'
   YNH_SOURCE: "https://github.com/yunohost"
-  YNH_DEBIAN: "bookworm"
+  YNH_DEBIAN: "trixie"
   YNH_SKIP_DIAGNOSIS_DURING_UPGRADE: "true"
 
 include:

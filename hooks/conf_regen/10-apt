@@ -11,7 +11,15 @@ do_pre_regen() {
 
     # Add sury
     mkdir -p ${pending_dir}/etc/apt/sources.list.d/
-    echo "deb [signed-by=/etc/apt/trusted.gpg.d/extra_php_version.gpg] https://packages.sury.org/php/ $(lsb_release --codename --short) main" > "${pending_dir}/etc/apt/sources.list.d/extra_php_version.list"
+
+    # FIXME: sury doesn't support trixie yet
+    case "$(lsb_release --codename --short)" in
+        bullseye) sury_distro=bullseye ;;
+        bookworm) sury_distro=bookworm ;;
+        trixie) sury_distro=bookworm ;;
+    esac
+
+    echo "deb [signed-by=/etc/apt/trusted.gpg.d/extra_php_version.gpg] https://packages.sury.org/php/ $sury_distro main" > "${pending_dir}/etc/apt/sources.list.d/extra_php_version.list"
 
     # Ban some packages from sury
     echo "

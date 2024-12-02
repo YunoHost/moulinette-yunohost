@@ -58,13 +58,13 @@ ynh_mysql_drop_db() {
 #
 # usage: ynh_mysql_dump_db database
 # | arg: database   - the database name to dump (by default, $db_name)
-# | ret: The mysqldump output
+# | ret: The mariadb-dump output
 #
 # example: ynh_mysql_dump_db "roundcube" > ./dump.sql
 #
 ynh_mysql_dump_db() {
     local database=${1:-$db_name}
-    mysqldump --single-transaction --skip-dump-date --routines "$database"
+    mariadb-dump --single-transaction --skip-dump-date --routines "$database"
 }
 
 # Create a user
@@ -101,7 +101,7 @@ ynh_mysql_user_exists() {
 #
 ynh_mysql_database_exists() {
     local database=$1
-    mysqlshow | grep -q "^| $database "
+    mariadb-show | grep -q "^| $database "
 }
 
 # Drop a user

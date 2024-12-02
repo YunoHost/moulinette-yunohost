@@ -16,7 +16,7 @@ Depends: python3-all (>= 3.11),
  , python3-toml, python3-packaging, python3-publicsuffix2
  , python3-ldap, python3-zeroconf (>= 0.47), python3-lexicon,
  , python3-cryptography, python3-jwt, python3-passlib, python3-magic
- , python-is-python3, python3-pydantic, python3-email-validator
+ , python-is-python3, python3-email-validator, python3-pydantic, python3-pydantic-extra-types
  , nginx, nginx-extras (>=1.22)
  , apt, apt-transport-https, apt-utils, aptitude, dirmngr
  , openssh-server, iptables, fail2ban, bind9-dnsutils
@@ -39,12 +39,13 @@ Conflicts: iptables-persistent
  , bind9
  , openresolv
  , systemd-resolved
- , nginx-extras (>= 1.23)
- , openssl (>= 3.1)
- , slapd (>= 2.6)
- , dovecot-core (>= 1:2.4)
- , fail2ban (>= 1.1)
- , iptables (>= 1.8.10)
+# FIXME: Those version should be updated to trixie-backports versions
+#  , nginx-extras (>= 1.23)
+#  , openssl (>= 3.1)
+#  , slapd (>= 2.6)
+#  , dovecot-core (>= 1:2.4)
+#  , fail2ban (>= 1.1)
+#  , iptables (>= 1.8.10)
 Description: manageable and configured self-hosting server
  YunoHost aims to make self-hosting accessible to everyone. It configures
  an email, Web and IM server alongside a LDAP base. It also provides
