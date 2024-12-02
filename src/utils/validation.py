@@ -414,7 +414,15 @@ class PathConstraints(BaseConstraints):
             if "://" in v:
                 v = Path(t.cast(str, AnyUrl(v).path).strip("/"))
             else:
-                v = v.strip().strip("./")
+                v = v.strip().strip("/")
+
+                for chars in ("?", "\n", "\t", "\r", " ", "./"):
+                    if chars in v:
+                        raise PydanticCustomError(
+                            "forbidden_chars",
+                            "Forbidden characters in string: {chars}",
+                            {"chars": chars},
+                        )
 
         path: Path | None = handler(v)
 

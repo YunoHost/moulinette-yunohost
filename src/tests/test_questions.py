@@ -1167,23 +1167,16 @@ class TestWebPath(BaseTest):
         ("value\n", "/value"),
         ("//value", "/value"),
         ("///value///", "/value"),
-        *xpass(scenarios=[
-            ("value\nvalue", "/value\nvalue"),
-            ("value value", "/value value"),
-            ("value//value", "/value/value"),
-        ], reason="Should fail"),
-        *xpass(scenarios=[
-            ("./here", "/here"),
-            ("../here", "/here"),
-            ("/somewhere/../here", "somewhere/../here"),
-        ], reason="Should fail or flattened"),
-        *xpass(scenarios=[
-            ("/one?withquery=ah", "/one?withquery=ah"),
-        ], reason="Should fail or query string removed?"),
+        ("value//value", "/value/value"),
         ("https://example.com/folder", "/folder"),
+        ("value\nvalue", FAIL),
+        ("value value", FAIL),
+        ("./here", FAIL),
+        ("../here", FAIL),
+        ("/somewhere/../here", FAIL),
+        ("/one?withquery=ah", FAIL),
         # readonly
         ("/overwrite", "/value", {"readonly": True, "default": "/value"}),
-        # FIXME should path have forbidden_chars?
         # multiple
         *nones(None, "", ",", ", , ", [], output="", raw_option={"multiple": True}),
         *commons("value\n,https://example.com/folder", output="/value,/folder", raw_option={"multiple": True}),
