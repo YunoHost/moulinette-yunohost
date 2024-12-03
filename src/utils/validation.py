@@ -337,7 +337,8 @@ class BooleanConstraints(BaseConstraints):
 
     def validate(self, v: t.Any) -> t.Any:
         v = self.preparse(v)
-
+        v = v.strip() if isinstance(v, str) else v
+        
         if v == self.serialization[0]:
             return True
         elif v == self.serialization[1]:
