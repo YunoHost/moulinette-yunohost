@@ -1300,6 +1300,10 @@ class FileOption(BaseInputOption):
     default: str | None = None
     accept: list[str] | None = None  # currently only used by the web-admin
 
+    def humanize(self, v: Any) -> str:
+        # In case of FileOption we don't want to run validation and serialization (file saving)
+        return coerce_nonish_to_none(v)
+
     def get_annotation(self, mode: Mode = "normal") -> tuple[Any, "FieldInfo"]:
         return self._build_annotation(
             str,
