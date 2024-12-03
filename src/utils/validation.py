@@ -26,7 +26,7 @@ for ext in ("test", "local", "localhost"):
 
 logger = getLogger("yunohost.validation")
 
-Mode = t.Literal["normal", "string"]
+Mode = t.Literal["normal", "string", "human"]
 Translation = dict[str, str] | str
 
 
@@ -309,12 +309,10 @@ class NumberConstraints(BaseConstraints):
             ),
         )
 
-        schema = cs.no_info_before_validator_function(
-            self.preparse,
-            schema,
-        )
+        return self.apply_base_schema(schema)
 
-        return schema
+    def serialize(self, v: int) -> int | str:
+        return str(v) if self.mode == "human" else v
 
 
 @dataclass
@@ -347,7 +345,12 @@ class BooleanConstraints(BaseConstraints):
         return v
 
     def serialize(self, v: bool) -> t.Any:
-        return self.serialization[0] if v is True else self.serialization[1]
+        if self.mode == "string":
+            return self.serialization[0] if v is True else self.serialization[1]
+        if self.mode == "human":
+            return "yes" if v is True else "no"
+            
+        return v
 
 
 @dataclass
