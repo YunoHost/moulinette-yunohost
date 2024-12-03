@@ -898,27 +898,6 @@ class NumberOption(BaseInputOption):
     max: int | None = None
     step: int | None = None
 
-    @staticmethod
-    def normalize(value, option={}) -> int | None:
-        if isinstance(value, int):
-            return value
-
-        if isinstance(value, str):
-            value = value.strip()
-
-        if isinstance(value, str) and value.isdigit():
-            return int(value)
-
-        if value in [None, ""]:
-            return None
-
-        option = option.model_dump() if isinstance(option, BaseOption) else option
-        raise YunohostValidationError(
-            "app_argument_invalid",
-            name=option.get("id"),
-            error=m18n.n("invalid_number"),
-        )
-
     def get_annotation(self, mode: Mode = "normal") -> tuple[Any, "FieldInfo"]:
         return self._build_annotation(
             int,
@@ -984,69 +963,6 @@ class BooleanOption(BaseInputOption):
         ), f"'yes' value can't be in {cls._yes_answers}"
 
         return v
-
-    @staticmethod
-    def humanize(value, option={}) -> str:
-        option = option.model_dump() if isinstance(option, BaseOption) else option
-
-        yes = option.get("yes", 1)
-        no = option.get("no", 0)
-
-        value = BooleanOption.normalize(value, option)
-
-        if value == yes:
-            return "yes"
-        if value == no:
-            return "no"
-        if value is None:
-            return ""
-
-        raise YunohostValidationError(
-            "app_argument_choice_invalid",
-            name=option.get("id"),
-            value=value,
-            choices="yes/no",
-        )
-
-    @staticmethod
-    def normalize(value, option={}) -> Any:
-        option = option.model_dump() if isinstance(option, BaseOption) else option
-
-        if isinstance(value, str):
-            value = value.strip()
-
-        technical_yes = option.get("yes", 1)
-        technical_no = option.get("no", 0)
-
-        no_answers = BooleanOption._no_answers
-        yes_answers = BooleanOption._yes_answers
-
-        assert (
-            str(technical_yes).lower() not in no_answers
-        ), f"'yes' value can't be in {no_answers}"
-        assert (
-            str(technical_no).lower() not in yes_answers
-        ), f"'no' value can't be in {yes_answers}"
-
-        no_answers.add(str(technical_no).lower())
-        yes_answers.add(str(technical_yes).lower())
-
-        strvalue = str(value).lower()
-
-        if strvalue in yes_answers:
-            return technical_yes
-        if strvalue in no_answers:
-            return technical_no
-
-        if strvalue in ["none", ""]:
-            return None
-
-        raise YunohostValidationError(
-            "app_argument_choice_invalid",
-            name=option.get("id"),
-            value=strvalue,
-            choices="yes/no",
-        )
 
     def get_annotation(self, mode: Mode = "normal") -> tuple[Any, "FieldInfo"]:
         return self._build_annotation(
@@ -1126,10 +1042,6 @@ class TimeOption(BaseInputOption):
     redact: Literal[False] = False
     default: datetime.time | list[datetime.time] | None = None
 
-    @staticmethod
-    def humanize(v: Any, option={}) -> str:
-        return v.strftime("%H:%M") if v else v
-
     def get_annotation(self, mode: Mode = "normal") -> tuple[Any, "FieldInfo"]:
         return self._build_annotation(
             datetime.time,
@@ -1194,38 +1106,6 @@ class WebPathOption(BaseInputOption):
     type: Literal[OptionType.path] = OptionType.path
     redact: Literal[False] = False
     default: Path | str | list[Path | str] | None = None
-
-    @staticmethod
-    def normalize(value, option={}) -> str:
-        option = option.model_dump() if isinstance(option, BaseOption) else option
-
-        if value is None:
-            value = ""
-
-        if not isinstance(value, Path | str):
-            raise YunohostValidationError(
-                "app_argument_invalid",
-                name=option.get("id"),
-                error="Argument for path should be a string.",
-            )
-
-        if isinstance(value, str):
-            if not value.strip():
-                if option.get("optional"):
-                    return ""
-                # Hmpf here we could just have a "else" case
-                # but we also want WebPathOption.normalize("") to return "/"
-                # (i.e. if no option is provided, hence .get("optional") is None
-                elif option.get("optional") is False:
-                    raise YunohostValidationError(
-                        "app_argument_invalid",
-                        name=option.get("id"),
-                        error="Option is mandatory",
-                    )
-
-            return "/" + value.strip().strip(" /")
-
-        return str(value)
 
     def get_annotation(self, mode: Mode = "normal") -> tuple[Any, "FieldInfo"]:
         return self._build_annotation(
@@ -1447,24 +1327,6 @@ class TagsOption(BaseChoicesOption):
     default: list[str] | None = None
     pattern: Pattern | None = None
     icon: str | None = None
-
-    @staticmethod
-    def humanize(value, option={}) -> str:
-        if isinstance(value, list):
-            return ",".join(str(v) for v in value)
-        if not value:
-            return ""
-        return value
-
-    @staticmethod
-    def normalize(value, option={}) -> str:
-        if isinstance(value, list):
-            return ",".join(str(v) for v in value)
-        if isinstance(value, str):
-            value = value.strip().strip(",")
-        if value is None or value == "":
-            return ""
-        return value
 
     def get_annotation(self, mode: Mode = "normal") -> tuple[Any, "FieldInfo"]:
         return self._build_annotation(
