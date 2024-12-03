@@ -166,8 +166,7 @@ class SettingsConfigPanel(ConfigPanel):
             if not option.readonly and (
                 option.optional or option.default not in {None, ""}
             ):
-                # FIXME Mypy complains about option.default not being a valid type for normalize but this should be ok
-                self.form[option.id] = option.normalize(option.default, option)  # type: ignore
+                self.form[option.id] = option.default
 
         # FIXME Not sure if this is need (redact call to operation logger does it on all the instances)
         # BaseOption.operation_logger = operation_logger

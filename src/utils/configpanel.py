@@ -45,8 +45,7 @@ from yunohost.utils.form import (
 from yunohost.utils.i18n import _value_for_locale
 
 if TYPE_CHECKING:
-    from pydantic import GetJsonSchemaHandler
-    from pydantic.fields import ValidationInfo
+    from pydantic import GetJsonSchemaHandler, ValidationInfo
     from pydantic.json_schema import JsonSchemaValue
     from pydantic.typing import AbstractSetIntStr, MappingIntStrAny
     from pydantic_core.core_schema import CoreSchema
@@ -510,7 +509,7 @@ class ConfigPanel:
             if isinstance(option, BaseReadonlyOption):
                 return None
 
-            return option.normalize(self.form[option_id], option)
+            return option.normalize(self.form[option_id])
 
         # Format result in 'classic' or 'export' mode
         self.config.translate()
@@ -524,9 +523,7 @@ class ConfigPanel:
                     for opt in section["options"]:
                         instance = self.config.get_option(opt["id"])
                         if isinstance(instance, BaseInputOption):
-                            opt["value"] = instance.normalize(
-                                self.form[opt["id"]], instance
-                            )
+                            opt["value"] = instance.normalize(self.form[opt["id"]])
             return result
 
         result = OrderedDict()
@@ -550,9 +547,7 @@ class ConfigPanel:
                         result[key] = {"ask": option.ask}
 
                         if isinstance(option, BaseInputOption):
-                            result[key]["value"] = option.humanize(
-                                self.form[option.id], option
-                            )
+                            result[key]["value"] = option.humanize(self.form[option.id])
                             if option.type is OptionType.password:
                                 result[key][
                                     "value"
