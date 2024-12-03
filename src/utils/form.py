@@ -46,6 +46,7 @@ from pydantic import (
     BaseModel,
     BeforeValidator,
     ConfigDict,
+    TypeAdapter,
     ValidationError,
     create_model,
     field_validator,
@@ -643,17 +644,13 @@ class BaseInputOption(BaseOption):
         multiple = info.data.get("multiple", False)
         return coerce_comalist_to_list(v) if multiple else coerce_nonish_to_none(v)
 
-    @staticmethod
-    def humanize(value: Any, option={}) -> str:
-        if value is None:
-            return ""
-        return str(value)
+    def humanize(self, v: Any) -> str:
+        return self.parse_and_validate(v, mode="human")
 
-    @staticmethod
-    def normalize(value, option={}):
-        if isinstance(value, str):
-            value = value.strip()
-        return value
+    def normalize(self, v: Any) -> Any:
+        # FIXME should use mode="normal" when implemented and create another
+        # method 'stringify' with mode="string"
+        return self.parse_and_validate(v, mode="string")
 
     def _get_field_attrs(self) -> dict[str, Any]:
         """
@@ -709,6 +706,18 @@ class BaseInputOption(BaseOption):
 
     def get_annotation(self, mode: Mode = "normal") -> tuple[Any, "FieldInfo"]:
         raise NotImplementedError()
+
+    def parse_and_validate(self, v: Any, mode: Mode = "normal") -> Any:
+        """
+        Validate a single value with the option's constraints
+        """
+        anno, field = self.get_annotation(mode=mode)
+        adapter: TypeAdapter = TypeAdapter(Annotated[anno, field])
+        try:
+            return adapter.dump_python(adapter.validate_python(v))
+        except ValidationError as e:
+            # FIXME should handle properly errors and i18n
+            raise YunohostValidationError(e.errors()[0]["msg"], raw_msg=True)
 
     def _get_prompt_message(self, value: Any) -> str:
         message = super()._get_prompt_message(value)
