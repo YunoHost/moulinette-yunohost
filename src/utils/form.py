@@ -388,7 +388,7 @@ class BaseOption(BaseModel):
     """
 
     type: OptionType
-    id: str
+    id: str = "item"
     mode: Mode = (
         "string"  # TODO use "normal" as default mode with AppConfigPanel setuping it to "string"
     )
@@ -412,11 +412,6 @@ class BaseOption(BaseModel):
         schema = handler(core_schema)
         del schema["properties"]["id"]
         del schema["properties"]["name"]
-        schema["required"] = [
-            required for required in schema.get("required", []) if required != "id"
-        ]
-        if not schema["required"]:
-            del schema["required"]
 
         return schema
 
