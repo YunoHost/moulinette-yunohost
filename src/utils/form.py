@@ -849,20 +849,6 @@ class ColorOption(BaseInputOption):
     redact: Literal[False] = False
     default: Color | str | list[Color | str] | None = None
 
-    @staticmethod
-    def humanize(value: Color | str | None, option={}) -> str:
-        if isinstance(value, Color):
-            value.as_named(fallback=True)
-
-        return super(ColorOption, ColorOption).humanize(value, option)
-
-    @staticmethod
-    def normalize(value: Color | str | None, option={}) -> str:
-        if isinstance(value, Color):
-            return value.as_hex()
-
-        return super(ColorOption, ColorOption).normalize(value, option)
-
     def get_annotation(self, mode: Mode = "normal") -> tuple[Any, "FieldInfo"]:
         return self._build_annotation(
             Color,
@@ -870,7 +856,11 @@ class ColorOption(BaseInputOption):
                 mode=mode,
                 has_default=self.default is not None and not self.multiple,
                 redact=self.redact,
-                serializer=lambda v: v.as_hex() if v else v,
+                serializer=lambda v: (
+                    (v.as_named(fallback=True) if mode == "human" else v.as_hex())
+                    if v
+                    else v
+                ),
             ),
             mode=mode,
         )
