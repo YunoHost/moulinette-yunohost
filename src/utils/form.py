@@ -724,7 +724,7 @@ class BaseInputOption(BaseOption):
 
         if self.readonly:
             message = colorize(message, "purple")
-            return f"{message} {self.humanize(value, self)}"
+            return f"{message} {self.humanize(value)}"
 
         return message
 
@@ -1840,7 +1840,7 @@ def prompt_or_validate_form(
             if option.id in prefilled_answers:
                 value = prefilled_answers[option.id]
             elif interactive:
-                value = option.humanize(value, option)
+                value = option.humanize(value)
                 choices = (
                     option.choices if isinstance(option, BaseChoicesOption) else []
                 )
@@ -1919,7 +1919,7 @@ def prompt_or_validate_form(
             for option_id, value in values.items():
                 option = next(opt for opt in options if option.id == option_id)
                 if option and isinstance(option, BaseInputOption):
-                    form[option.id] = option.normalize(value, option)
+                    form[option.id] = option.normalize(value)
                     context[option.id] = form[option.id]
 
     return form
