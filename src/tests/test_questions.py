@@ -675,7 +675,7 @@ class TestString(BaseTest):
     raw_option = {"type": "string", "id": "string_id"}
     prefill = {
         "raw_option": {"default": " custom default"},
-        "prefill": " custom default",
+        "prefill": "custom default",
     }
     # fmt: off
     scenarios = [
@@ -1148,7 +1148,7 @@ class TestWebPath(BaseTest):
     raw_option = {"type": "path", "id": "path_id"}
     prefill = {
         "raw_option": {"default": "some_path"},
-        "prefill": "some_path",
+        "prefill": "/some_path",
     }
     # fmt: off
     scenarios = [
@@ -1711,7 +1711,7 @@ class TestApp(BaseTest):
     def test_options_prompted_with_ask_help(self, prefill_data=None):
         with patch_apps(apps=[installed_webapp, installed_non_webapp]):
             super().test_options_prompted_with_ask_help(
-                prefill_data={"raw_option": {"optional": True}, "prefill": ""}
+                prefill_data={"raw_option": {"optional": True}, "prefill": "_none"}
             )
 
     def test_scenarios(self, intake, expected_output, raw_option, data):
