@@ -7,11 +7,6 @@ ruby_version_path="$rbenv_install_dir/versions"
 export RBENV_ROOT="$rbenv_install_dir"
 export rbenv_root="$rbenv_install_dir"
 
-if dpkg --compare-versions ${YNH_APP_PACKAGING_FORMAT:-0} lt 2; then
-    build_ruby_dependencies="libjemalloc-dev curl build-essential libreadline-dev zlib1g-dev libsqlite3-dev libssl-dev libxml2-dev libxslt-dev autoconf automake bison libtool"
-    build_pkg_dependencies="${build_pkg_dependencies:-} $build_ruby_dependencies"
-fi
-
 # Load the version of Ruby for an app, and set variables.
 #
 # ynh_use_ruby has to be used in any app scripts before using Ruby for the first time.
@@ -29,7 +24,7 @@ fi
 # However, $PATH is duplicated into $ruby_path to outlast any manipulation of $PATH
 # You can use the variable `$ynh_ruby_load_path` to quickly load your Ruby version
 #  in $PATH for an usage into a separate script.
-# Exemple: $ynh_ruby_load_path $final_path/script_that_use_gem.sh`
+# Exemple: $ynh_ruby_load_path $install_dir/script_that_use_gem.sh`
 #
 #
 # Finally, to start a Ruby service with the correct version, 2 solutions
@@ -74,7 +69,7 @@ ynh_use_ruby() {
     ynh_ruby_load_path="PATH=$PATH"
 
     # Sets the local application-specific Ruby version
-    pushd ${install_dir:-$final_path}
+    pushd ${install_dir}
     $rbenv_install_dir/bin/rbenv local $ruby_version
     popd
 }

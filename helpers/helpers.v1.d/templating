@@ -22,7 +22,6 @@
 #   __NAME__                by $app
 #   __NAMETOCHANGE__        by $app
 #   __USER__                by $app
-#   __FINALPATH__           by $final_path
 #   __PHPVERSION__          by $YNH_PHP_VERSION (packaging v1 only, packaging v2 uses phpversion setting implicitly set by apt resource)
 #   __YNH_NODE_LOAD_PATH__  by $ynh_node_load_PATH
 # ```
@@ -110,7 +109,6 @@ ynh_add_config() {
 #   __NAME__                by $app
 #   __NAMETOCHANGE__        by $app
 #   __USER__                by $app
-#   __FINALPATH__           by $final_path
 #   __PHPVERSION__          by $YNH_PHP_VERSION (packaging v1 only, packaging v2 uses phpversion setting implicitly set by apt resource)
 #   __YNH_NODE_LOAD_PATH__  by $ynh_node_load_PATH
 #
@@ -140,15 +138,6 @@ ynh_replace_vars() {
         ynh_replace_string --match_string="__NAME__" --replace_string="$app" --target_file="$file"
         ynh_replace_string --match_string="__NAMETOCHANGE__" --replace_string="$app" --target_file="$file"
         ynh_replace_string --match_string="__USER__" --replace_string="$app" --target_file="$file"
-    fi
-    # Legacy
-    if test -n "${final_path:-}"; then
-        ynh_replace_string --match_string="__FINALPATH__" --replace_string="$final_path" --target_file="$file"
-        ynh_replace_string --match_string="__INSTALL_DIR__" --replace_string="$final_path" --target_file="$file"
-    fi
-    # Legacy / Packaging v1 only
-    if dpkg --compare-versions ${YNH_APP_PACKAGING_FORMAT:-0} lt 2 && test -n "${YNH_PHP_VERSION:-}"; then
-        ynh_replace_string --match_string="__PHPVERSION__" --replace_string="$YNH_PHP_VERSION" --target_file="$file"
     fi
     if test -n "${ynh_node_load_PATH:-}"; then
         ynh_replace_string --match_string="__YNH_NODE_LOAD_PATH__" --replace_string="$ynh_node_load_PATH" --target_file="$file"

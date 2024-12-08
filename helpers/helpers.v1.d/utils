@@ -66,7 +66,7 @@ ynh_abort_if_errors() {
 }
 
 # When running an app script with packaging format >= 2, auto-enable ynh_abort_if_errors except for remove script
-if [[ "${YNH_CONTEXT:-}" != "regenconf" ]] && dpkg --compare-versions ${YNH_APP_PACKAGING_FORMAT:-0} ge 2 && [[ ${YNH_APP_ACTION} != "remove" ]]; then
+if [[ "${YNH_CONTEXT:-}" != "regenconf" ]] && [[ ${YNH_APP_ACTION} != "remove" ]]; then
     ynh_abort_if_errors
 fi
 

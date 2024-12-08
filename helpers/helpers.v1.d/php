@@ -103,12 +103,7 @@ ynh_add_fpm_config() {
 
     fi
 
-    # Set the default PHP-FPM version by default
-    if dpkg --compare-versions ${YNH_APP_PACKAGING_FORMAT:-0} lt 2; then
-        phpversion="${phpversion:-$YNH_PHP_VERSION}"
-    else
-        phpversion="${phpversion:-$_globalphpversion}"
-    fi
+    phpversion="${phpversion:-$_globalphpversion}"
 
     local old_phpversion=$(ynh_app_setting_get --app=$app --key=phpversion)
 

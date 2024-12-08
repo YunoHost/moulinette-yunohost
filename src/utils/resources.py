@@ -235,7 +235,6 @@ class AppResource:
 
         env_ = _make_environment_for_app_script(
             self.app,
-            force_include_app_settings=True,
         )
         env_.update(env)
 
@@ -267,7 +266,6 @@ class AppResource:
             self.app,
             workdir=workdir,
             action=f"{action}_{self.type}",
-            force_include_app_settings=True,
         )
         env_.update(env)
 

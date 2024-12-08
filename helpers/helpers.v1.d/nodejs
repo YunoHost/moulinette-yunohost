@@ -25,7 +25,7 @@ export N_PREFIX="$n_install_dir"
 # However, $PATH is duplicated into $node_PATH to outlast any manipulation of `$PATH`
 # You can use the variable `$ynh_node_load_PATH` to quickly load your node version
 # in $PATH for an usage into a separate script.
-# Exemple: $ynh_node_load_PATH $final_path/script_that_use_npm.sh`
+# Exemple: $ynh_node_load_PATH $install_dir/script_that_use_npm.sh`
 #
 #
 # Finally, to start a nodejs service with the correct version, 2 solutions

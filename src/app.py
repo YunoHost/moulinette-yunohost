@@ -25,7 +25,6 @@ import yaml
 import re
 import subprocess
 import tempfile
-import copy
 from typing import TYPE_CHECKING, List, Tuple, Dict, Any, Iterator, Optional, Union
 from packaging import version
 from logging import getLogger
@@ -241,10 +240,7 @@ def app_info(app, full=False, upgradable=False):
     ret["supports_config_panel"] = os.path.exists(
         os.path.join(setting_path, "config_panel.toml")
     )
-    ret["supports_purge"] = (
-        local_manifest["packaging_format"] >= 2
-        and local_manifest["resources"].get("data_dir") is not None
-    )
+    ret["supports_purge"] = local_manifest["resources"].get("data_dir") is not None
 
     ret["permissions"] = permissions
     ret["label"] = permissions.get(app + ".main", {}).get("label")
@@ -560,7 +556,6 @@ def app_upgrade(
     )
     from yunohost.permission import permission_sync_to_user
     from yunohost.regenconf import manually_modified_files
-    from yunohost.utils.legacy import _patch_legacy_helpers
     from yunohost.backup import (
         backup_list,
         backup_create,
@@ -682,45 +677,44 @@ def app_upgrade(
             )
             _display_notifications(notifications, force=force)
 
-        if manifest["packaging_format"] >= 2:
-            if no_safety_backup:
-                # FIXME: i18n
-                logger.warning(
-                    "Skipping the creation of a backup prior to the upgrade."
+        if no_safety_backup:
+            # FIXME: i18n
+            logger.warning(
+                "Skipping the creation of a backup prior to the upgrade."
+            )
+        else:
+            # FIXME: i18n
+            logger.info("Creating a safety backup prior to the upgrade")
+
+            # Switch between pre-upgrade1 or pre-upgrade2
+            safety_backup_name = f"{app_instance_name}-pre-upgrade1"
+            other_safety_backup_name = f"{app_instance_name}-pre-upgrade2"
+            if safety_backup_name in backup_list()["archives"]:
+                safety_backup_name = f"{app_instance_name}-pre-upgrade2"
+                other_safety_backup_name = f"{app_instance_name}-pre-upgrade1"
+
+            tweaked_backup_core_only = False
+            if "BACKUP_CORE_ONLY" not in os.environ:
+                tweaked_backup_core_only = True
+                os.environ["BACKUP_CORE_ONLY"] = "1"
+            try:
+                backup_create(
+                    name=safety_backup_name, apps=[app_instance_name], system=None
                 )
+            finally:
+                if tweaked_backup_core_only:
+                    del os.environ["BACKUP_CORE_ONLY"]
+
+            if safety_backup_name in backup_list()["archives"]:
+                # if the backup suceeded, delete old safety backup to save space
+                if other_safety_backup_name in backup_list()["archives"]:
+                    backup_delete(other_safety_backup_name)
             else:
-                # FIXME: i18n
-                logger.info("Creating a safety backup prior to the upgrade")
-
-                # Switch between pre-upgrade1 or pre-upgrade2
-                safety_backup_name = f"{app_instance_name}-pre-upgrade1"
-                other_safety_backup_name = f"{app_instance_name}-pre-upgrade2"
-                if safety_backup_name in backup_list()["archives"]:
-                    safety_backup_name = f"{app_instance_name}-pre-upgrade2"
-                    other_safety_backup_name = f"{app_instance_name}-pre-upgrade1"
-
-                tweaked_backup_core_only = False
-                if "BACKUP_CORE_ONLY" not in os.environ:
-                    tweaked_backup_core_only = True
-                    os.environ["BACKUP_CORE_ONLY"] = "1"
-                try:
-                    backup_create(
-                        name=safety_backup_name, apps=[app_instance_name], system=None
-                    )
-                finally:
-                    if tweaked_backup_core_only:
-                        del os.environ["BACKUP_CORE_ONLY"]
-
-                if safety_backup_name in backup_list()["archives"]:
-                    # if the backup suceeded, delete old safety backup to save space
-                    if other_safety_backup_name in backup_list()["archives"]:
-                        backup_delete(other_safety_backup_name)
-                else:
-                    # Is this needed ? Shouldn't backup_create report an expcetion if backup failed ?
-                    raise YunohostError(
-                        "Uhoh the safety backup failed ?! Aborting the upgrade process.",
-                        raw_msg=True,
-                    )
+                # Is this needed ? Shouldn't backup_create report an expcetion if backup failed ?
+                raise YunohostError(
+                    "Uhoh the safety backup failed ?! Aborting the upgrade process.",
+                    raw_msg=True,
+                )
 
         _assert_system_is_sane_for_app(manifest, "pre")
 
@@ -728,9 +722,6 @@ def app_upgrade(
         manually_modified_files_before_install = manually_modified_files()
 
         app_setting_path = os.path.join(APPS_SETTING_PATH, app_instance_name)
-
-        # Attempt to patch legacy helpers ...
-        _patch_legacy_helpers(extracted_app_folder)
 
         # Prepare env. var. to pass to script
         env_dict = _make_environment_for_app_script(
@@ -743,9 +734,6 @@ def app_upgrade(
             "YNH_APP_CURRENT_VERSION": str(app_current_version_raw),
         }
 
-        if manifest["packaging_format"] < 2:
-            env_dict_more["NO_BACKUP_UPGRADE"] = "1" if no_safety_backup else "0"
-
         env_dict.update(env_dict_more)
 
         # Start register change on system
@@ -753,30 +741,28 @@ def app_upgrade(
         operation_logger = OperationLogger("app_upgrade", related_to, env=env_dict)
         operation_logger.start()
 
-        if manifest["packaging_format"] >= 2:
-            from yunohost.utils.resources import AppResourceManager
+        from yunohost.utils.resources import AppResourceManager
 
-            AppResourceManager(
-                app_instance_name,
-                wanted=manifest,
-                current=app_dict["manifest"],
-                workdir=extracted_app_folder,
-            ).apply(
-                rollback_and_raise_exception_if_failure=True,
-                operation_logger=operation_logger,
-                action="upgrade",
-            )
+        AppResourceManager(
+            app_instance_name,
+            wanted=manifest,
+            current=app_dict["manifest"],
+            workdir=extracted_app_folder,
+        ).apply(
+            rollback_and_raise_exception_if_failure=True,
+            operation_logger=operation_logger,
+            action="upgrade",
+        )
 
-            # Boring stuff : the resource upgrade may have added/remove/updated setting
-            # so we need to reflect this in the env_dict used to call the actual upgrade script x_x
-            # Or: the old manifest may be in v1 and the new in v2, so force to add the setting in env
-            env_dict = _make_environment_for_app_script(
-                app_instance_name,
-                workdir=extracted_app_folder,
-                action="upgrade",
-                force_include_app_settings=True,
-            )
-            env_dict.update(env_dict_more)
+        # Boring stuff : the resource upgrade may have added/remove/updated setting
+        # so we need to reflect this in the env_dict used to call the actual upgrade script x_x
+        # Or: the old manifest may be in v1 and the new in v2, so force to add the setting in env
+        env_dict = _make_environment_for_app_script(
+            app_instance_name,
+            workdir=extracted_app_folder,
+            action="upgrade",
+        )
+        env_dict.update(env_dict_more)
 
         # Execute the app upgrade script
         upgrade_failed = True
@@ -795,11 +781,7 @@ def app_upgrade(
             )
         finally:
             # If upgrade failed, try to restore the safety backup
-            if (
-                upgrade_failed
-                and manifest["packaging_format"] >= 2
-                and not no_safety_backup
-            ):
+            if upgrade_failed and not no_safety_backup:
                 logger.warning(
                     "Upgrade failed ... attempting to restore the safety backup (Yunohost first need to remove the app for this) ..."
                 )
@@ -1057,14 +1039,12 @@ def app_install(
     )
     from yunohost.log import OperationLogger
     from yunohost.permission import (
-        user_permission_list,
         permission_create,
-        permission_delete,
         permission_sync_to_user,
     )
     from yunohost.regenconf import manually_modified_files
-    from yunohost.utils.legacy import _patch_legacy_helpers
     from yunohost.utils.form import ask_questions_and_parse_answers
+    from yunohost.utils.resources import AppResourceManager
     from yunohost.user import user_list
 
     # Check if disk space available
@@ -1080,8 +1060,6 @@ def app_install(
             manifest["notifications"]["PRE_INSTALL"]
         )
         _display_notifications(notifications, force=force)
-
-    packaging_format = manifest["packaging_format"]
 
     # Check ID
     if "id" not in manifest or "__" in manifest["id"] or "." in manifest["id"]:
@@ -1128,10 +1106,6 @@ def app_install(
     path_requirement = _guess_webapp_path_requirement(extracted_app_folder)
     _validate_webpath_requirement(args, path_requirement)
 
-    if packaging_format < 2:
-        # Attempt to patch legacy helpers ...
-        _patch_legacy_helpers(extracted_app_folder)
-
     # We'll check that the app didn't brutally edit some system configuration
     manually_modified_files_before_install = manually_modified_files()
 
@@ -1155,18 +1129,17 @@ def app_install(
         "current_revision": manifest.get("remote", {}).get("revision", "?"),
     }
 
-    # If packaging_format v2+, save all install options as settings
-    if packaging_format >= 2:
-        for option in options:
-            # Except readonly "questions" that don't even have a value
-            if option.readonly:
-                continue
-            # Except user-provider passwords
-            # ... which we need to reinject later in the env_dict
-            if option.type == "password":
-                continue
+    # Save all install options as settings
+    for option in options:
+        # Except readonly "questions" that don't even have a value
+        if option.readonly:
+            continue
+        # Except user-provider passwords
+        # ... which we need to reinject later in the env_dict
+        if option.type == "password":
+            continue
 
-            app_settings[option.id] = form[option.id]
+        app_settings[option.id] = form[option.id]
 
     _set_app_settings(app_instance_name, app_settings)
 
@@ -1188,18 +1161,15 @@ def app_install(
     if label:
         manifest["name"] = label
 
-    if packaging_format >= 2:
-        from yunohost.utils.resources import AppResourceManager
-
-        try:
-            AppResourceManager(app_instance_name, wanted=manifest, current={}).apply(
-                rollback_and_raise_exception_if_failure=True,
-                operation_logger=operation_logger,
-                action="install",
-            )
-        except (KeyboardInterrupt, EOFError, Exception) as e:
-            shutil.rmtree(app_setting_path)
-            raise e
+    try:
+        AppResourceManager(app_instance_name, wanted=manifest, current={}).apply(
+            rollback_and_raise_exception_if_failure=True,
+            operation_logger=operation_logger,
+            action="install",
+        )
+    except (KeyboardInterrupt, EOFError, Exception) as e:
+        shutil.rmtree(app_setting_path)
+        raise e
     else:
         # Initialize the main permission for the app
         # The permission is initialized with no url associated, and with tile disabled
@@ -1219,13 +1189,12 @@ def app_install(
         app_instance_name, args=args, workdir=extracted_app_folder, action="install"
     )
 
-    # If packaging_format v2+, save all install options as settings
-    if packaging_format >= 2:
-        for option in options:
-            # Reinject user-provider passwords which are not in the app settings
-            # (cf a few line before)
-            if option.type == "password":
-                env_dict[option.id] = form[option.id]
+    # Save all install options as settings
+    for option in options:
+        # Reinject user-provider passwords which are not in the app settings
+        # (cf a few line before)
+        if option.type == "password":
+            env_dict[option.id] = form[option.id]
 
     # We want to hav the env_dict in the log ... but not password values
     env_dict_for_logging = env_dict.copy()
@@ -1275,9 +1244,7 @@ def app_install(
                 "Packagers /!\\ This app manually modified some system configuration files! This should not happen! If you need to do so, you should implement a proper conf_regen hook. Those configuration were affected:\n    - "
                 + "\n     -".join(manually_modified_files_by_app)
             )
-            # Actually forbid this for app packaging >= 2
-            if packaging_format >= 2:
-                broke_the_system = True
+            broke_the_system = True
 
         # If the install failed or broke the system, we remove it
         if install_failed or broke_the_system:
@@ -1323,17 +1290,11 @@ def app_install(
                     m18n.n("unexpected_error", error="\n" + traceback.format_exc())
                 )
 
-            if packaging_format >= 2:
-                from yunohost.utils.resources import AppResourceManager
+            from yunohost.utils.resources import AppResourceManager
 
-                AppResourceManager(
-                    app_instance_name, wanted={}, current=manifest
-                ).apply(rollback_and_raise_exception_if_failure=False, action="remove")
-            else:
-                # Remove all permission in LDAP
-                for permission_name in user_permission_list()["permissions"].keys():
-                    if permission_name.startswith(app_instance_name + "."):
-                        permission_delete(permission_name, force=True, sync_perm=False)
+            AppResourceManager(
+                app_instance_name, wanted={}, current=manifest
+            ).apply(rollback_and_raise_exception_if_failure=False, action="remove")
 
             if remove_retcode != 0:
                 msg = m18n.n("app_not_properly_removed", app=app_instance_name)
@@ -1397,13 +1358,9 @@ def app_remove(operation_logger, app, purge=False, force_workdir=None):
         purge -- Remove with all app data
         force_workdir -- Special var to force the working directoy to use, in context such as remove-after-failed-upgrade or remove-after-failed-restore
     """
-    from yunohost.utils.legacy import _patch_legacy_helpers
+    from yunohost.utils.resources import AppResourceManager
     from yunohost.hook import hook_exec, hook_remove, hook_callback
-    from yunohost.permission import (
-        user_permission_list,
-        permission_delete,
-        permission_sync_to_user,
-    )
+    from yunohost.permission import permission_sync_to_user
     from yunohost.domain import domain_list, domain_config_set, _get_raw_domain_settings
 
     _assert_is_installed(app)
@@ -1412,9 +1369,6 @@ def app_remove(operation_logger, app, purge=False, force_workdir=None):
 
     logger.info(m18n.n("app_start_remove", app=app))
     app_setting_path = os.path.join(APPS_SETTING_PATH, app)
-
-    # Attempt to patch legacy helpers ...
-    _patch_legacy_helpers(app_setting_path)
 
     if force_workdir:
         # This is when e.g. calling app_remove() from the upgrade-failed case
@@ -1455,19 +1409,11 @@ def app_remove(operation_logger, app, purge=False, force_workdir=None):
     finally:
         shutil.rmtree(tmp_workdir_for_app)
 
-    packaging_format = manifest["packaging_format"]
-    if packaging_format >= 2:
-        from yunohost.utils.resources import AppResourceManager
-
-        AppResourceManager(app, wanted={}, current=manifest).apply(
-            rollback_and_raise_exception_if_failure=False,
-            purge_data_dir=purge,
-            action="remove",
-        )
-    else:
-        # Remove all permission in LDAP
-        for permission_name in user_permission_list(apps=[app])["permissions"].keys():
-            permission_delete(permission_name, force=True, sync_perm=False)
+    AppResourceManager(app, wanted={}, current=manifest).apply(
+        rollback_and_raise_exception_if_failure=False,
+        purge_data_dir=purge,
+        action="remove",
+    )
 
     if purge and os.path.exists(f"/var/log/{app}"):
         shutil.rmtree(f"/var/log/{app}")
@@ -2252,9 +2198,6 @@ def _get_manifest_of_app(path):
         str(manifest.get("packaging_format", "")).strip() or "0"
     )
 
-    if manifest["packaging_format"] < 2:
-        manifest = _convert_v1_manifest_to_v2(manifest)
-
     manifest["install"] = _set_default_ask_questions(manifest.get("install", {}))
     manifest["doc"], manifest["notifications"] = _parse_app_doc_and_notifications(path)
 
@@ -2345,86 +2288,6 @@ def _hydrate_app_template(template, data):
             template = template.replace(stuff, str(data[varname]))
 
     return template.strip()
-
-
-def _convert_v1_manifest_to_v2(manifest):
-    manifest = copy.deepcopy(manifest)
-
-    if "upstream" not in manifest:
-        manifest["upstream"] = {}
-
-    if "license" in manifest and "license" not in manifest["upstream"]:
-        manifest["upstream"]["license"] = manifest["license"]
-
-    if "url" in manifest and "website" not in manifest["upstream"]:
-        manifest["upstream"]["website"] = manifest["url"]
-
-    manifest["integration"] = {
-        "yunohost": manifest.get("requirements", {})
-        .get("yunohost", "")
-        .replace(">", "")
-        .replace("=", "")
-        .replace(" ", ""),
-        "architectures": "?",
-        "multi_instance": manifest.get("multi_instance", False),
-        "ldap": "?",
-        "sso": "?",
-        "disk": "?",
-        "ram": {"build": "?", "runtime": "?"},
-    }
-
-    maintainers = manifest.get("maintainer", {})
-    if isinstance(maintainers, list):
-        maintainers = [m["name"] for m in maintainers]
-    else:
-        maintainers = [maintainers["name"]] if maintainers.get("name") else []
-
-    manifest["maintainers"] = maintainers
-
-    install_questions = manifest["arguments"]["install"]
-
-    manifest["install"] = {}
-    for question in install_questions:
-        name = question.pop("name")
-        if "ask" in question and name in [
-            "domain",
-            "path",
-            "admin",
-            "is_public",
-            "password",
-        ]:
-            question.pop("ask")
-        if question.get("example") and question.get("type") in [
-            "domain",
-            "path",
-            "user",
-            "boolean",
-            "password",
-        ]:
-            question.pop("example")
-
-        manifest["install"][name] = question
-
-    manifest["resources"] = {"system_user": {}, "install_dir": {"alias": "final_path"}}
-
-    keys_to_keep = [
-        "packaging_format",
-        "id",
-        "name",
-        "description",
-        "version",
-        "maintainers",
-        "upstream",
-        "integration",
-        "install",
-        "resources",
-    ]
-
-    keys_to_del = [key for key in manifest.keys() if key not in keys_to_keep]
-    for key in keys_to_del:
-        del manifest[key]
-
-    return manifest
 
 
 def _set_default_ask_questions(questions, script_name="install"):
@@ -2777,7 +2640,7 @@ def _check_manifest_requirements(
     logger.debug(m18n.n("app_requirements_checking", app=app_id))
 
     # Packaging format
-    if manifest["packaging_format"] not in [1, 2]:
+    if manifest["packaging_format"] not in [2]:
         raise YunohostValidationError("app_packaging_format_not_supported")
 
     # Yunohost version
@@ -2897,33 +2760,12 @@ def _guess_webapp_path_requirement(app_folder: str) -> str:
     if len(domain_questions) == 1 and len(path_questions) == 1:
         return "domain_and_path"
     if len(domain_questions) == 1 and len(path_questions) == 0:
-        if manifest.get("packaging_format", 0) < 2:
-            # This is likely to be a full-domain app...
-
-            # Confirm that this is a full-domain app This should cover most cases
-            # ...  though anyway the proper solution is to implement some mechanism
-            # in the manifest for app to declare that they require a full domain
-            # (among other thing) so that we can dynamically check/display this
-            # requirement on the webadmin form and not miserably fail at submit time
-
-            # Full-domain apps typically declare something like path_url="/" or path=/
-            # and use ynh_webpath_register or yunohost_app_checkurl inside the install script
-            install_script_content = read_file(
-                os.path.join(app_folder, "scripts/install")
-            )
-
-            if re.search(
-                r"\npath(_url)?=[\"']?/[\"']?", install_script_content
-            ) and re.search(r"ynh_webpath_register", install_script_content):
-                return "full_domain"
-
-        else:
-            # For packaging v2 apps, check if there's a permission with url being a string
-            perm_resource = manifest.get("resources", {}).get("permissions")
-            if perm_resource is not None and isinstance(
-                perm_resource.get("main", {}).get("url"), str
-            ):
-                return "full_domain"
+        # Check if there's a permission with url being a string
+        perm_resource = manifest.get("resources", {}).get("permissions")
+        if perm_resource is not None and isinstance(
+            perm_resource.get("main", {}).get("url"), str
+        ):
+            return "full_domain"
 
     return "?"
 
@@ -3002,7 +2844,6 @@ def _make_environment_for_app_script(
     args_prefix="APP_ARG_",
     workdir=None,
     action=None,
-    force_include_app_settings=False,
 ):
     app_setting_path = os.path.join(APPS_SETTING_PATH, app)
 
@@ -3035,45 +2876,44 @@ def _make_environment_for_app_script(
         arg_name_upper = arg_name.upper()
         env_dict[f"YNH_{args_prefix}{arg_name_upper}"] = str(arg_value)
 
-    # If packaging format v2, load all settings
-    if manifest["packaging_format"] >= 2 or force_include_app_settings:
-        env_dict["app"] = app
-        data_to_redact = []
-        prefixes_or_suffixes_to_redact = [
-            "pwd",
-            "pass",
-            "passwd",
-            "password",
-            "passphrase",
-            "secret",
-            "key",
-            "token",
-        ]
+    # Load all settings
+    env_dict["app"] = app
+    data_to_redact = []
+    prefixes_or_suffixes_to_redact = [
+        "pwd",
+        "pass",
+        "passwd",
+        "password",
+        "passphrase",
+        "secret",
+        "key",
+        "token",
+    ]
 
-        for setting_name, setting_value in _get_app_settings(app).items():
-            # Ignore special internal settings like checksum__
-            # (not a huge deal to load them but idk...)
-            if setting_name.startswith("checksum__"):
-                continue
+    for setting_name, setting_value in _get_app_settings(app).items():
+        # Ignore special internal settings like checksum__
+        # (not a huge deal to load them but idk...)
+        if setting_name.startswith("checksum__"):
+            continue
 
-            setting_value = str(setting_value)
-            env_dict[setting_name] = setting_value
+        setting_value = str(setting_value)
+        env_dict[setting_name] = setting_value
 
-            # Check if we should redact this setting value
-            # (the check on the setting length exists to prevent stupid stuff like redacting empty string or something which is actually just 0/1, true/false, ...
-            if len(setting_value) > 6 and any(
-                setting_name.startswith(p) or setting_name.endswith(p)
-                for p in prefixes_or_suffixes_to_redact
-            ):
-                data_to_redact.append(setting_value)
+        # Check if we should redact this setting value
+        # (the check on the setting length exists to prevent stupid stuff like redacting empty string or something which is actually just 0/1, true/false, ...
+        if len(setting_value) > 6 and any(
+            setting_name.startswith(p) or setting_name.endswith(p)
+            for p in prefixes_or_suffixes_to_redact
+        ):
+            data_to_redact.append(setting_value)
 
-        # Special weird case for backward compatibility...
-        # 'path' was loaded into 'path_url' .....
-        if "path" in env_dict:
-            env_dict["path_url"] = env_dict["path"]
+    # Special weird case for backward compatibility...
+    # 'path' was loaded into 'path_url' .....
+    if "path" in env_dict:
+        env_dict["path_url"] = env_dict["path"]
 
-        for operation_logger in OperationLogger._instances:
-            operation_logger.data_to_redact.extend(data_to_redact)
+    for operation_logger in OperationLogger._instances:
+        operation_logger.data_to_redact.extend(data_to_redact)
 
     return env_dict
 

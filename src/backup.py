@@ -1345,9 +1345,7 @@ class RestoreManager:
         app_instance_name -- (string) The app name to restore (no app with this
                              name should be already install)
         """
-        from yunohost.utils.legacy import (
-            _patch_legacy_helpers,
-        )
+        from yunohost.utils.resources import AppResourceManager
         from yunohost.user import user_group_list
         from yunohost.permission import (
             permission_create,
@@ -1380,9 +1378,6 @@ class RestoreManager:
         app_backup_in_archive = os.path.join(app_dir_in_archive, "backup")
         app_settings_in_archive = os.path.join(app_dir_in_archive, "settings")
         app_scripts_in_archive = os.path.join(app_settings_in_archive, "scripts")
-
-        # Attempt to patch legacy helpers...
-        _patch_legacy_helpers(app_settings_in_archive)
 
         # Delete _common.sh file in backup
         common_file = os.path.join(app_backup_in_archive, "_common.sh")
@@ -1495,14 +1490,12 @@ class RestoreManager:
         operation_logger.flush()
 
         manifest = _get_manifest_of_app(app_settings_in_archive)
-        if manifest["packaging_format"] >= 2:
-            from yunohost.utils.resources import AppResourceManager
 
-            AppResourceManager(app_instance_name, wanted=manifest, current={}).apply(
-                rollback_and_raise_exception_if_failure=True,
-                operation_logger=operation_logger,
-                action="restore",
-            )
+        AppResourceManager(app_instance_name, wanted=manifest, current={}).apply(
+            rollback_and_raise_exception_if_failure=True,
+            operation_logger=operation_logger,
+            action="restore",
+        )
 
         # Execute the app install script
         restore_failed = True

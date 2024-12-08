@@ -204,10 +204,6 @@ ynh_setup_source() {
     if [ -n "${install_dir:-}" ] && [ "$dest_dir" == "$install_dir" ]; then
         _ynh_apply_default_permissions $dest_dir
     fi
-    if [ -n "${final_path:-}" ] && [ "$dest_dir" == "$final_path" ]; then
-        _ynh_apply_default_permissions $dest_dir
-    fi
-
     if [[ "$src_extract" == "false" ]]; then
         if [[ -z "$src_rename" ]]; then
             mv $src_filename $dest_dir

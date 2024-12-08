@@ -9,7 +9,7 @@ YNH_COMPOSER_VERSION=${YNH_COMPOSER_VERSION:-$YNH_DEFAULT_COMPOSER_VERSION}
 #
 # usage: ynh_composer_exec [--phpversion=phpversion] [--workdir=$install_dir] --commands="commands"
 # | arg: -v, --phpversion - PHP version to use with composer
-# | arg: -w, --workdir - The directory from where the command will be executed. Default $install_dir or $final_path
+# | arg: -w, --workdir - The directory from where the command will be executed. Default $install_dir
 # | arg: -c, --commands - Commands to execute.
 #
 # Requires YunoHost version 4.2 or higher.
@@ -23,13 +23,9 @@ ynh_composer_exec() {
     local commands
     # Manage arguments with getopts
     ynh_handle_getopts_args "$@"
-    workdir="${workdir:-${install_dir:-$final_path}}"
+    workdir="${workdir:-${install_dir}}"
 
-    if dpkg --compare-versions ${YNH_APP_PACKAGING_FORMAT:-0} lt 2; then
-        phpversion="${phpversion:-$YNH_PHP_VERSION}"
-    else
-        phpversion="${phpversion:-$_globalphpversion}"
-    fi
+    phpversion="${phpversion:-$_globalphpversion}"
 
     COMPOSER_HOME="$workdir/.composer" COMPOSER_MEMORY_LIMIT=-1 \
         php${phpversion} "$workdir/composer.phar" $commands \
@@ -56,18 +52,8 @@ ynh_install_composer() {
     local composerversion
     # Manage arguments with getopts
     ynh_handle_getopts_args "$@"
-    if dpkg --compare-versions ${YNH_APP_PACKAGING_FORMAT:-0} lt 2; then
-        workdir="${workdir:-$final_path}"
-    else
-        workdir="${workdir:-$install_dir}"
-    fi
-
-    if dpkg --compare-versions ${YNH_APP_PACKAGING_FORMAT:-0} lt 2; then
-        phpversion="${phpversion:-$YNH_PHP_VERSION}"
-    else
-        phpversion="${phpversion:-$_globalphpversion}"
-    fi
-
+    workdir="${workdir:-$install_dir}"
+    phpversion="${phpversion:-$_globalphpversion}"
     install_args="${install_args:-}"
     composerversion="${composerversion:-$YNH_COMPOSER_VERSION}"
 
