@@ -22,4 +22,4 @@ backup_dir="$1/conf/ynh/certs"
 
 mkdir -p /etc/yunohost/certs/
 
-cp -a $backup_dir/. /etc/yunohost/certs/
+cp -a "$backup_dir/." /etc/yunohost/certs/

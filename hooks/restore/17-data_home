@@ -20,4 +20,4 @@
 
 backup_dir="$1/data/home"
 
-cp -a $backup_dir/. /home
+cp -a "$backup_dir/." /home

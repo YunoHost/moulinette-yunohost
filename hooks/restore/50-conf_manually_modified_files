@@ -18,13 +18,16 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+# Source YNH helpers
+# shellcheck source=../../helpers/helpers
 source /usr/share/yunohost/helpers
+
 ynh_abort_if_errors
 YNH_CWD="${YNH_BACKUP_DIR%/}/conf/manually_modified_files"
 cd "$YNH_CWD"
 
-for file in $(cat ./manually_modified_files_list); do
+while read -r file; do
     ynh_restore_file --origin_path="$file" --not_mandatory
-done
+done < ./manually_modified_files_list
 
 ynh_restore_file --origin_path="/etc/ssowat/conf.json.persistent" --not_mandatory

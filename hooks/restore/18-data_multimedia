@@ -22,6 +22,7 @@
 set -eu
 
 # Source YNH helpers
+# shellcheck source=../../helpers/helpers
 source /usr/share/yunohost/helpers
 
 backup_dir="data/multimedia"
