@@ -28,5 +28,4 @@ jobs:
           tests/test_helpers.v2.d
           helpers/vendor
           src/vendor
-          hooks
           helpers
