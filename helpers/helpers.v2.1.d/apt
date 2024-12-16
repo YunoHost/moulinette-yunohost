@@ -59,7 +59,7 @@ ynh_apt_install_dependencies() {
 
     if [[ -n "$specific_php_version" ]]; then
         # Cover a small edge case where a packager could have specified "php7.4-pwet php5-gni" which is confusing
-        [[ $(echo $specific_php_version | wc -l) -eq 1 ]] \
+        [[ $(echo "$specific_php_version" | wc -l) -eq 1 ]] \
             || ynh_die "Inconsistent php versions in dependencies ... found : $specific_php_version"
 
         dependencies+=", php${specific_php_version}, php${specific_php_version}-fpm, php${specific_php_version}-common"
@@ -74,14 +74,14 @@ ynh_apt_install_dependencies() {
             fi
         fi
         # Store php_version into the config of this app
-        ynh_app_setting_set --key=php_version --value=$specific_php_version
+        ynh_app_setting_set --key=php_version --value="$specific_php_version"
 
         # Set the default php version back as the default version for php-cli.
-        if test -e /usr/bin/php$YNH_DEFAULT_PHP_VERSION; then
-            update-alternatives --set php /usr/bin/php$YNH_DEFAULT_PHP_VERSION
+        if test -e "/usr/bin/php$YNH_DEFAULT_PHP_VERSION"; then
+            update-alternatives --set php "/usr/bin/php$YNH_DEFAULT_PHP_VERSION"
         fi
     elif grep --quiet 'php' <<< "$dependencies"; then
-        ynh_app_setting_set --key=php_version --value=$YNH_DEFAULT_PHP_VERSION
+        ynh_app_setting_set --key=php_version --value="$YNH_DEFAULT_PHP_VERSION"
     fi
 
     # Specific tweak related to Postgresql (cf end of the helper)
@@ -109,11 +109,11 @@ ynh_apt_install_dependencies() {
 
     # Prepare the virtual-dependency control file for dpkg-deb --build
     local TMPDIR=$(mktemp --directory)
-    mkdir -p ${TMPDIR}/${app_ynh_deps}/DEBIAN
+    mkdir -p "$TMPDIR/$app_ynh_deps/DEBIAN"
     # For some reason, dpkg-deb insists for folder perm to be 755 and sometimes it's 777 o_O?
-    chmod -R 755 ${TMPDIR}/${app_ynh_deps}
+    chmod -R 755 "$TMPDIR/$app_ynh_deps"
 
-    cat > ${TMPDIR}/${app_ynh_deps}/DEBIAN/control << EOF
+    cat > "$TMPDIR/$app_ynh_deps/DEBIAN/control" << EOF
 Section: misc
 Priority: optional
 Package: ${app_ynh_deps}
@@ -143,8 +143,8 @@ EOF
         # (the following is ran inside { } to not start a subshell otherwise ynh_die wouldnt exit the original process)
         # Parse the list of problematic dependencies from dpkg's log ...
         # (relevant lines look like: "foo-ynh-deps depends on bar; however:")
-        cat $TMPDIR/dpkg_log
-        local problematic_dependencies="$(grep -oP '(?<=-ynh-deps depends on ).*(?=; however)' $TMPDIR/dpkg_log | tr '\n' ' ')"
+        cat "$TMPDIR/dpkg_log"
+        local problematic_dependencies="$(grep -oP '(?<=-ynh-deps depends on ).*(?=; however)' "$TMPDIR/dpkg_log" | tr '\n' ' ')"
         # Fake an install of those dependencies to see the errors
         # The sed command here is, Print only from 'Reading state info' to the end.
         [[ -n "$problematic_dependencies" ]] && _ynh_apt_install $problematic_dependencies --dry-run 2>&1 | sed --quiet '/Reading state info/,$p' | grep -v "fix-broken\|Reading state info" >&2
@@ -338,11 +338,11 @@ _ynh_apt_package_version() {
 # APT wrapper for non-interactive operation
 _ynh_apt() {
     _ynh_wait_dpkg_free
-    LC_ALL=C DEBIAN_FRONTEND=noninteractive apt-get --assume-yes --quiet -o=Acquire::Retries=3 -o=Dpkg::Use-Pty=0 $@
+    LC_ALL=C DEBIAN_FRONTEND=noninteractive apt-get --assume-yes --quiet -o=Acquire::Retries=3 -o=Dpkg::Use-Pty=0 "$@"
 }
 
 # Wrapper around "apt install" with the appropriate options
 _ynh_apt_install() {
     _ynh_apt --no-remove --option Dpkg::Options::=--force-confdef \
-        --option Dpkg::Options::=--force-confold install $@
+        --option Dpkg::Options::=--force-confold install "$@"
 }

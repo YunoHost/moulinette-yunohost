@@ -193,7 +193,7 @@ ynh_handle_getopts_args() {
             fi
 
             # Shift the parameter and its argument(s)
-            shift $shift_value
+            shift "$shift_value"
         done
     }
 

@@ -86,7 +86,7 @@ ynh_app_setting_set_default() {
     # ===========================================
 
     if [ -z "${!key:-}" ]; then
-        eval $key=\$value
+        eval "$key=\$value"
         ynh_app_setting "set" "$app" "$key" "$value"
     fi
 }
@@ -148,7 +148,7 @@ EOF
 if [[ -n "${app:-}" ]] && [[ -n "${phpversion:-}" ]]; then
     if [[ -z "${php_version:-}" ]]; then
         php_version=$phpversion
-        ynh_app_setting_set --key=php_version --value=$php_version
+        ynh_app_setting_set --key=php_version --value="$php_version"
     fi
     ynh_app_setting_delete --key=phpversion
     unset phpversion

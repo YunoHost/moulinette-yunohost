@@ -103,7 +103,7 @@ do_pre_regen() {
     # Define if we need to migrate from hdb to mdb
     curr_backend=$(grep '^database' /etc/ldap/slapd.conf 2> /dev/null | awk '{print $2}')
     if [ -e /etc/ldap/slapd.conf ] && [ -n "$curr_backend" ] \
-        && [ $curr_backend != 'mdb' ]; then
+        && [ "$curr_backend" != 'mdb' ]; then
         backup_dir="/var/backups/dc=yunohost,dc=org-${curr_backend}-$(date +%s)"
         mkdir -p "$backup_dir"
         slapcat -b dc=yunohost,dc=org -l "${backup_dir}/dc=yunohost-dc=org.ldif"
@@ -121,8 +121,8 @@ do_pre_regen() {
     cp -a ldap.conf "$ldap_dir"
     cp -a sudo.ldif mailserver.ldif permission.ldif "$schema_dir"
 
-    mkdir -p ${pending_dir}/etc/systemd/system/slapd.service.d/
-    cp systemd-override.conf ${pending_dir}/etc/systemd/system/slapd.service.d/ynh-override.conf
+    mkdir -p "${pending_dir}/etc/systemd/system/slapd.service.d/"
+    cp systemd-override.conf "${pending_dir}/etc/systemd/system/slapd.service.d/ynh-override.conf"
 
     install -D -m 644 slapd.default "${pending_dir}/etc/default/slapd"
 }
@@ -184,4 +184,4 @@ objectClass: top"
     systemctl force-reload slapd
 }
 
-do_$1_regen ${@:2}
+"do_${1}_regen" "${@:2}"

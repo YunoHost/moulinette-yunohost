@@ -72,9 +72,9 @@ ynh_psql_drop_db() {
     local db=$1
     # First, force disconnection of all clients connected to the database
     # https://stackoverflow.com/questions/17449420/postgresql-unable-to-drop-database-because-of-some-auto-connections-to-db
-    sudo --login --user=postgres psql $db <<< "REVOKE CONNECT ON DATABASE $db FROM public;"
-    sudo --login --user=postgres psql $db <<< "SELECT pg_terminate_backend (pg_stat_activity.pid) FROM pg_stat_activity WHERE pg_stat_activity.datname = '$db' AND pid <> pg_backend_pid();"
-    sudo --login --user=postgres dropdb $db
+    sudo --login --user=postgres psql "$db" <<< "REVOKE CONNECT ON DATABASE $db FROM public;"
+    sudo --login --user=postgres psql "$db" <<< "SELECT pg_terminate_backend (pg_stat_activity.pid) FROM pg_stat_activity WHERE pg_stat_activity.datname = '$db' AND pid <> pg_backend_pid();"
+    sudo --login --user=postgres dropdb "$db"
 }
 
 # Dump a database

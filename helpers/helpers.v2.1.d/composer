@@ -29,9 +29,12 @@
 ynh_composer_install() {
     local workdir="${composer_workdir:-$install_dir}"
 
-    [[ -n "${composer_version}" ]] || ynh_die "\$composer_version should be defined before calling ynh_composer_install. (In the past, this was called \$YNH_COMPOSER_VERSION)"
-
-    [[ ! -e "$workdir/composer.phar" ]] || ynh_safe_rm $workdir/composer.phar
+    if [[ -z "${composer_version}" ]]; then
+        ynh_die "\$composer_version should be defined before calling ynh_composer_install. (In the past, this was called \$YNH_COMPOSER_VERSION)"
+    fi
+    if [[ -e "$workdir/composer.phar" ]]; then
+        ynh_safe_rm "$workdir/composer.phar"
+    fi
 
     local composer_url="https://getcomposer.org/download/$composer_version/composer.phar"
 
@@ -40,7 +43,7 @@ ynh_composer_install() {
     # because local always return 0 ...
     local out
     # Timeout option is here to enforce the timeout on dns query and tcp connect (c.f. man wget)
-    out=$(wget --tries 3 --no-dns-cache --timeout 900 --no-verbose --output-document=$workdir/composer.phar $composer_url 2>&1) \
+    out=$(wget --tries 3 --no-dns-cache --timeout 900 --no-verbose --output-document="$workdir/composer.phar" "$composer_url" 2>&1) \
         || ynh_die "$out"
 }
 
@@ -58,6 +61,6 @@ ynh_composer_exec() {
     COMPOSER_HOME="$workdir/.composer" \
         COMPOSER_MEMORY_LIMIT=-1 \
         sudo -E -u "${composer_user:-$app}" \
-        php${php_version} "$workdir/composer.phar" $@ \
+        "php$php_version" "$workdir/composer.phar" "$@" \
         -d "$workdir" --no-interaction --no-ansi 2>&1
 }

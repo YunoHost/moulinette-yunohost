@@ -82,7 +82,7 @@ ynh_config_add_phpfpm() {
     local php_memory_limit=${php_memory_limit:-128M} # default value is from global php.ini
 
     local phpfpm_template=$(mktemp)
-    cat << EOF > $phpfpm_template
+    cat << EOF > "$phpfpm_template"
 [__APP__]
 
 user = __APP__
@@ -101,26 +101,26 @@ request_terminate_timeout = 1d
 
 EOF
     if [ "$php_process_management" = "dynamic" ]; then
-        cat << EOF >> $phpfpm_template
+        cat << EOF >> "$phpfpm_template"
 pm.start_servers = __PHP_START_SERVERS__
 pm.min_spare_servers = __PHP_MIN_SPARE_SERVERS__
 pm.max_spare_servers = __PHP_MAX_SPARE_SERVERS__
 EOF
     elif [ "$php_process_management" = "ondemand" ]; then
-        cat << EOF >> $phpfpm_template
+        cat << EOF >> "$phpfpm_template"
 pm.process_idle_timeout = 10s
 EOF
     fi
 
-    cat << EOF >> $phpfpm_template
+    cat << EOF >> "$phpfpm_template"
 php_admin_value[upload_max_filesize] = __PHP_UPLOAD_MAX_FILESIZE__
 php_admin_value[post_max_size] = __PHP_UPLOAD_MAX_FILESIZE__
 php_admin_value[memory_limit] = __PHP_MEMORY_LIMIT__
 EOF
 
     # Concatene the extra config
-    if [ -e $YNH_APP_BASEDIR/conf/extra_php-fpm.conf ]; then
-        cat $YNH_APP_BASEDIR/conf/extra_php-fpm.conf >> "$phpfpm_template"
+    if [ -e "$YNH_APP_BASEDIR/conf/extra_php-fpm.conf" ]; then
+        cat "$YNH_APP_BASEDIR/conf/extra_php-fpm.conf" >> "$phpfpm_template"
     fi
 
     # Make sure the fpm pool dir exists
@@ -129,13 +129,13 @@ EOF
     ynh_config_add --template="$phpfpm_template" --destination="/etc/php/$php_version/fpm/pool.d/$app.conf"
 
     # Validate that the new php conf doesn't break php-fpm entirely
-    if ! php-fpm${php_version} --test 2> /dev/null; then
-        php-fpm${php_version} --test || true
+    if ! "php-fpm$php_version" --test 2> /dev/null; then
+        "php-fpm$php_version" --test || true
         ynh_safe_rm "/etc/php/$php_version/fpm/pool.d/$app.conf"
         ynh_die "The new configuration broke php-fpm?"
     fi
 
-    ynh_systemctl --service=php${php_version}-fpm --action=reload
+    ynh_systemctl --service="php${php_version}-fpm" --action=reload
 }
 
 # Remove the dedicated PHP-FPM config
@@ -154,7 +154,7 @@ _default_php_max_children() {
     # divide again by 20MB (= a default, classic worker footprint) This is
     # designed such that if PHP-FPM start the maximum of children, it won't
     # exceed half of the ram.
-    local php_max_children="$(($total_ram / 40))"
+    local php_max_children="$((total_ram / 40))"
     # Make sure we get at least max_children = 1
     if [ $php_max_children -le 0 ]; then
         php_max_children=1

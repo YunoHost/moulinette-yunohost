@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2155,SC2001
 #
 # Copyright (c) 2024 YunoHost Contributors
 #
@@ -20,7 +21,9 @@
 
 set -e
 
-. /usr/share/yunohost/helpers
+# Source YNH helpers
+# shellcheck source=../../helpers/helpers
+source /usr/share/yunohost/helpers
 
 do_base_regen() {
 
@@ -41,8 +44,8 @@ do_base_regen() {
     ynh_render_template "yunohost_admin.conf.inc" "${nginx_conf_dir}/yunohost_admin.conf.inc"
     ynh_render_template "yunohost_api.conf.inc" "${nginx_conf_dir}/yunohost_api.conf.inc"
 
-    mkdir -p $nginx_conf_dir/default.d/
-    cp "redirect_to_admin.conf" $nginx_conf_dir/default.d/
+    mkdir -p "$nginx_conf_dir/default.d/"
+    cp "redirect_to_admin.conf" "$nginx_conf_dir/default.d/"
 }
 
 do_init_regen() {
@@ -97,9 +100,9 @@ do_pre_regen() {
     if [[ "$tls_passthrough_enabled" == "True" ]]; then
         ynh_render_template "tls_passthrough.conf" "${tls_passthrough_module}"
         for tls_passthrough_domain_and_ip in $(echo "$tls_passthrough_list" | sed 's/,/\n/g'); do
-            export tls_passthrough_domain=$(echo $tls_passthrough_domain_and_ip | awk -F';' '{print $1}')
-            export tls_passthrough_ip=$(echo $tls_passthrough_domain_and_ip | awk -F';' '{print $2}')
-            export tls_passthrough_port=$(echo $tls_passthrough_domain_and_ip | awk -F';' '{print $3}')
+            export tls_passthrough_domain=$(echo "$tls_passthrough_domain_and_ip" | awk -F';' '{print $1}')
+            export tls_passthrough_ip=$(echo "$tls_passthrough_domain_and_ip" | awk -F';' '{print $2}')
+            export tls_passthrough_port=$(echo "$tls_passthrough_domain_and_ip" | awk -F';' '{print $3}')
             ynh_render_template "tls_passthrough_server.conf" "${nginx_conf_dir}/${tls_passthrough_domain}.forward80.conf"
         done
     else
@@ -110,9 +113,8 @@ do_pre_regen() {
     # meaning it should be removed by the regen conf
     # - For real 'existing' domains, this file will be overwritten with an actual conf right after using ynh_render_template
     # - For old domains, this will tell the regen conf that it is "to be deleted"
-    ls -1 /etc/nginx/conf.d \
-        | awk '/^[^\.]+\.[^\.]+.*\.conf$/ { print $1 }' \
-        | xargs --replace={} touch ${nginx_conf_dir}/{}
+    find /etc/nginx/conf.d -mindepth 1 -maxdepth 1 -type f -name "*.*.conf" -printf "$nginx_conf_dir/%f\0" \
+        | xargs --null touch
 
     # add domain conf files
     cert_status=$(yunohost domain cert status --json)
@@ -125,7 +127,7 @@ do_pre_regen() {
 
         # NGINX server configuration
         export domain
-        export domain_cert_ca=$(echo $cert_status \
+        export domain_cert_ca=$(echo "$cert_status" \
             | jq ".certificates.\"$domain\".CA_type" \
             | tr -d '"')
         if echo "$mail_domain_list" | grep -q "^$domain$"; then
@@ -149,9 +151,9 @@ do_pre_regen() {
     # remove old mail-autoconfig files
     autoconfig_files=$(ls -1 /var/www/.well-known/*/autoconfig/mail/config-v1.1.xml 2> /dev/null || true)
     for file in $autoconfig_files; do
-        domain=$(basename $(readlink -f $(dirname $file)/../..))
+        domain=$(basename "$(readlink -f "$(dirname "$file")/../..")")
         [[ $YNH_DOMAINS =~ $domain ]] \
-            || (mkdir -p "$(dirname ${pending_dir}/${file})" && touch "${pending_dir}/${file}")
+            || (mkdir -p "$(dirname "${pending_dir}/${file}")" && touch "${pending_dir}/${file}")
     done
 
     # disable default site
@@ -182,10 +184,12 @@ do_post_regen() {
         nginx -t
         exit 1
     }
-    pgrep nginx && systemctl reload nginx || {
-        journalctl --no-pager --lines=10 -u nginx >&2
-        exit 1
-    }
+    if pgrep nginx; then
+        systemctl reload nginx || {
+            journalctl --no-pager --lines=10 -u nginx >&2
+            exit 1
+        }
+    fi
 }
 
-do_$1_regen ${@:2}
+"do_${1}_regen" "${@:2}"

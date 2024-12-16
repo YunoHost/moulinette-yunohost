@@ -40,7 +40,7 @@ ynh_config_add_systemd() {
 
     ynh_config_add --template="$template" --destination="/etc/systemd/system/$service.service"
 
-    systemctl enable $service --quiet
+    systemctl enable "$service" --quiet
     systemctl daemon-reload
 }
 
@@ -51,8 +51,8 @@ ynh_config_add_systemd() {
 ynh_config_remove_systemd() {
     local service="${1:-$app}"
     if [ -e "/etc/systemd/system/$service.service" ]; then
-        ynh_systemctl --service=$service --action=stop
-        systemctl disable $service --quiet
+        ynh_systemctl --service="$service" --action=stop
+        systemctl disable "$service" --quiet
         ynh_safe_rm "/etc/systemd/system/$service.service"
         systemctl daemon-reload
     fi
@@ -91,7 +91,7 @@ ynh_systemctl() {
     fi
 
     # Manage case of service already stopped
-    if [ "$action" == "stop" ] && ! systemctl is-active --quiet $service; then
+    if [ "$action" == "stop" ] && ! systemctl is-active --quiet "$service"; then
         return 0
     fi
 
@@ -101,7 +101,7 @@ ynh_systemctl() {
         # Following the starting of the app in its log
         if [ "$log_path" == "systemd" ]; then
             # Read the systemd journal
-            journalctl --unit=$service --follow --since=-0 --quiet > "$templog" &
+            journalctl --unit="$service" --follow --since=-0 --quiet > "$templog" &
             # Get the PID of the journalctl command
             local pid_tail=$!
         else
@@ -120,12 +120,12 @@ ynh_systemctl() {
     local time_start="$(date --utc --rfc-3339=seconds | cut -d+ -f1) UTC"
 
     # If the service fails to perform the action
-    if ! systemctl $action $service; then
+    if ! systemctl "$action" "$service"; then
         # Show syslog for this service
-        journalctl --quiet --no-hostname --no-pager --lines=$length --unit=$service >&2
+        journalctl --quiet --no-hostname --no-pager --lines=$length --unit="$service" >&2
         # If a log is specified for this service, show also the content of this log
         if [ -e "$log_path" ]; then
-            tail --lines=$length "$log_path" >&2
+            tail --lines="$length" "$log_path" >&2
         fi
         _ynh_clean_check_starting
         return 1
@@ -136,11 +136,11 @@ ynh_systemctl() {
         set +o xtrace # set +x
         local i=0
         local starttime=$(date +%s)
-        for i in $(seq 1 $timeout); do
+        for i in $(seq 1 "$timeout"); do
             # Read the log until the sentence is found, that means the app finished to start. Or run until the timeout
             if [ "$log_path" == "systemd" ]; then
                 # For systemd services, we in fact dont rely on the templog, which for some reason is not reliable, but instead re-read journalctl every iteration, starting at the timestamp where we triggered the action
-                if journalctl --unit=$service --since="$time_start" --quiet --no-pager --no-hostname | grep --extended-regexp --quiet "$wait_until"; then
+                if journalctl --unit="$service" --since="$time_start" --quiet --no-pager --no-hostname | grep --extended-regexp --quiet "$wait_until"; then
                     ynh_print_info "The service $service has correctly executed the action ${action}."
                     break
                 fi
@@ -163,20 +163,20 @@ ynh_systemctl() {
             sleep 1
         done
         set -o xtrace # set -x
-        if [ $i -ge 3 ]; then
+        if [ "$i" -ge 3 ]; then
             echo "" >&2
         fi
-        if [ $i -eq $timeout ]; then
+        if [ "$i" -eq "$timeout" ]; then
             ynh_print_warn "The service $service didn't fully executed the action ${action} before the timeout."
             ynh_print_warn "Please find here an extract of the end of the log of the service $service:"
-            journalctl --quiet --no-hostname --no-pager --lines=$length --unit=$service >&2
+            journalctl --quiet --no-hostname --no-pager --lines="$length" --unit="$service" >&2
             if [ -e "$log_path" ]; then
                 ynh_print_warn "==="
-                tail --lines=$length "$log_path" >&2
+                tail --lines="$length" "$log_path" >&2
             fi
 
             # If we tried to reload/start/restart the service but systemctl consider it to be still inactive/broken, then handle it as a failure
-            if ([ "$action" == "reload" ] || [ "$action" == "start" ] || [ "$action" == "restart" ]) && ! systemctl --quiet is-active $service; then
+            if ([ "$action" == "reload" ] || [ "$action" == "start" ] || [ "$action" == "restart" ]) && ! systemctl --quiet is-active "$service"; then
                 _ynh_clean_check_starting
                 return 1
             fi
@@ -188,7 +188,7 @@ ynh_systemctl() {
 _ynh_clean_check_starting() {
     if [ -n "${pid_tail:-}" ]; then
         # Stop the execution of tail.
-        kill -SIGTERM $pid_tail 2>&1
+        kill -SIGTERM "$pid_tail" 2>&1
     fi
     if [ -n "${templog:-}" ]; then
         ynh_safe_rm "$templog" 2>&1

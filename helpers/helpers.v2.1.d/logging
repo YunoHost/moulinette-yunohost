@@ -106,18 +106,18 @@ ynh_script_progression() {
     fi
 
     # Increment each execution of ynh_script_progression in this script by the weight of the previous call.
-    increment_progression=$(($increment_progression + $previous_weight))
+    increment_progression=$((increment_progression + previous_weight))
     # Store the weight of the current call in $previous_weight for next call
     previous_weight=1
 
     # Reduce $increment_progression to the size of the scale
-    local effective_progression=$(($increment_progression * $progress_scale / $max_progression))
+    local effective_progression=$((increment_progression * progress_scale / max_progression))
 
     # If last is specified, fill immediately the progression_bar
 
     # Build $progression_bar from progress_string(0,1,2) according to $effective_progression and the weight of the current task
     # expected_progression is the progression expected after the current task
-    local expected_progression="$((($increment_progression + 1) * $progress_scale / $max_progression - $effective_progression))"
+    local expected_progression=$(( (increment_progression + 1) * progress_scale / max_progression - effective_progression))
 
     # Hack for the "--last" message
     if grep -qw 'completed' <<< "$1"; then
@@ -125,7 +125,7 @@ ynh_script_progression() {
         expected_progression=0
     fi
     # left_progression is the progression not yet done
-    local left_progression="$(($progress_scale - $effective_progression - $expected_progression))"
+    local left_progression="$((progress_scale - effective_progression - expected_progression))"
     # Build the progression bar with $effective_progression, work done, $expected_progression, current work and $left_progression, work to be done.
     local progression_bar="${progress_string2:0:$effective_progression}${progress_string1:0:$expected_progression}${progress_string0:0:$left_progression}"
 

@@ -34,12 +34,12 @@ mkdir -p "$MEDIA_DIRECTORY/$user/eBook"
 ln -sfn "$MEDIA_DIRECTORY/share" "$MEDIA_DIRECTORY/$user/Share"
 # Création du lien symbolique dans le home de l'utilisateur.
 #link will only be created if the home directory of the user exists and if it's located in '/home' folder
-user_home="$(getent passwd $user | cut -d: -f6 | grep '^/home/')"
+user_home="$(getent passwd "$user" | cut -d: -f6 | grep '^/home/')"
 if [[ -d "$user_home" ]]; then
     ln -sfn "$MEDIA_DIRECTORY/$user" "$user_home/Multimedia"
 fi
 # Propriétaires des dossiers utilisateurs.
-chown -R $user "$MEDIA_DIRECTORY/$user"
+chown -R "$user" "$MEDIA_DIRECTORY/$user"
 
 ## Application des droits étendus sur le dossier multimedia.
 # Droit d'écriture pour le groupe et le groupe multimedia en acl et droit de lecture pour other:

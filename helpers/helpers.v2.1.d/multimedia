@@ -47,12 +47,12 @@ ynh_multimedia_build_main_dir() {
         ln -sfn "$MEDIA_DIRECTORY/share" "$MEDIA_DIRECTORY/$user/Share"
         # Création du lien symbolique dans le home de l'utilisateur.
         #link will only be created if the home directory of the user exists and if it's located in '/home' folder
-        local user_home="$(getent passwd $user | cut -d: -f6 | grep '^/home/')"
+        local user_home="$(getent passwd "$user" | cut -d: -f6 | grep '^/home/')"
         if [[ -d "$user_home" ]]; then
             ln -sfn "$MEDIA_DIRECTORY/$user" "$user_home/Multimedia"
         fi
         # Propriétaires des dossiers utilisateurs.
-        chown -R $user "$MEDIA_DIRECTORY/$user"
+        chown -R "$user" "$MEDIA_DIRECTORY/$user"
     done
     # Default yunohost hooks for post_user_create,delete will take care
     # of creating/deleting corresponding multimedia folders when users
@@ -103,5 +103,5 @@ ynh_multimedia_addfolder() {
 # | arg: user_name   - The name of the user which gain this access.
 ynh_multimedia_addaccess() {
     groupadd -f $MEDIA_GROUP
-    usermod -a -G $MEDIA_GROUP $1
+    usermod -a -G $MEDIA_GROUP "$1"
 }

@@ -41,7 +41,7 @@ _ynh_load_go_in_path_and_other_tweaks() {
 
     # Sets the local application-specific go version
     pushd ${install_dir}
-    $GOENV_INSTALL_DIR/bin/goenv local $go_version
+    $GOENV_INSTALL_DIR/bin/goenv local "$go_version"
     popd
 }
 
@@ -184,7 +184,7 @@ _ynh_go_cleanup() {
     # Remove no more needed Go versions
     local installed_go_versions=$(goenv versions --bare --skip-aliases | grep -Ev '/')
     for installed_go_version in $installed_go_versions; do
-        if ! $(echo ${required_go_versions} | grep "${installed_go_version}" 1> /dev/null 2>&1); then
+        if ! $(echo "${required_go_versions}" | grep "${installed_go_version}" 1> /dev/null 2>&1); then
             ynh_print_info "Removing of Go-$installed_go_version"
             $GOENV_INSTALL_DIR/bin/goenv uninstall --force "$installed_go_version"
         fi
@@ -201,8 +201,8 @@ _ynh_go_cleanup() {
 
 _ynh_go_try_bash_extension() {
     if [ -x src/configure ]; then
-        src/configure && make -C src || {
+        if ! (src/configure && make -C src); then
             ynh_print_info "Optional bash extension failed to build, but things will still work normally."
-        }
+        fi
     fi
 }

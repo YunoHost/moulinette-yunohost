@@ -32,11 +32,11 @@ ynh_mysql_db_shell() {
 
     local default_character_set=""
     if [[ -n "$database" ]]; then
-        default_character_set=$(mysql -B $database <<< 'show variables like "character_set_database";' | tail -n1 | cut -f2)
+        default_character_set=$(mysql -B "$database" <<< 'show variables like "character_set_database";' | tail -n1 | cut -f2)
         default_character_set="--default-character-set=$default_character_set"
     fi
 
-    mysql $default_character_set -B $database
+    mysql "$default_character_set" -B "$database"
 }
 
 # Create a database and grant optionnaly privilegies to a user
@@ -92,11 +92,11 @@ ynh_mysql_dump_db() {
 
     local default_character_set=""
     if [[ -n "$database" ]]; then
-        default_character_set=$(mysql -B $database <<< 'show variables like "character_set_database";' | tail -n1 | cut -f2)
+        default_character_set=$(mysql -B "$database" <<< 'show variables like "character_set_database";' | tail -n1 | cut -f2)
         default_character_set="--default-character-set=$default_character_set"
     fi
 
-    mysqldump $default_character_set --single-transaction --skip-dump-date --routines "$database"
+    mysqldump "$default_character_set" --single-transaction --skip-dump-date --routines "$database"
 }
 
 # Create a user

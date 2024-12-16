@@ -40,7 +40,6 @@ CAN_BIND=${CAN_BIND:-1}
 # data/logs are not destroyed.
 #
 ynh_backup() {
-
     local target="$1"
     local is_data=false
 
@@ -56,7 +55,7 @@ ynh_backup() {
     # If backing up core only (used by ynh_backup_before_upgrade),
     # don't backup big data items
     if [[ "$is_data" == true ]] && ([[ ${do_not_backup_data:-0} -eq 1 ]] || [[ ${BACKUP_CORE_ONLY:-0} -eq 1 ]]); then
-        if [ $BACKUP_CORE_ONLY -eq 1 ]; then
+        if [ "$BACKUP_CORE_ONLY" -eq 1 ]; then
             ynh_print_info "$target will not be saved, because 'BACKUP_CORE_ONLY' is set."
         else
             ynh_print_info "$target will not be saved, because 'do_not_backup_data' is set."

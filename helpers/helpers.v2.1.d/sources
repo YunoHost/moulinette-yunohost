@@ -155,15 +155,15 @@ ynh_setup_source() {
             # because local always return 0 ...
             local out
             # Timeout option is here to enforce the timeout on dns query and tcp connect (c.f. man wget)
-            out=$(wget --tries 3 --no-dns-cache --timeout 900 --no-verbose --output-document=$src_filename $src_url 2>&1) \
+            out=$(wget --tries 3 --no-dns-cache --timeout 900 --no-verbose --output-document="$src_filename" "$src_url" 2>&1) \
                 || ynh_die "$out"
         fi
 
         # Check the control sum
         if ! echo "${src_sum} ${src_filename}" | sha256sum --check --status; then
-            local actual_sum="$(sha256sum ${src_filename} | cut --delimiter=' ' --fields=1)"
-            local actual_size="$(du -hs ${src_filename} | cut --fields=1)"
-            rm -f ${src_filename}
+            local actual_sum="$(sha256sum "$src_filename" | cut --delimiter=' ' --fields=1)"
+            local actual_size="$(du -hs "$src_filename" | cut --fields=1)"
+            rm -f "$src_filename"
             ynh_die "Corrupt source for ${src_url}: Expected sha256sum to be ${src_sum} but got ${actual_sum} (size: ${actual_size})."
         fi
     fi
@@ -173,7 +173,7 @@ ynh_setup_source() {
     rm -rf /var/cache/yunohost/files_to_keep_during_setup_source/
     if [ -n "$keep" ] && [ -e "$dest_dir" ]; then
         local keep_dir=/var/cache/yunohost/files_to_keep_during_setup_source/${YNH_APP_ID}
-        mkdir -p $keep_dir
+        mkdir -p "$keep_dir"
         local stuff_to_keep
         for stuff_to_keep in $keep; do
             if [ -e "$dest_dir/$stuff_to_keep" ]; then
@@ -192,22 +192,22 @@ ynh_setup_source() {
 
     if [[ "$src_extract" == "false" ]]; then
         if [[ -z "$src_rename" ]]; then
-            mv $src_filename $dest_dir
+            mv "$src_filename" "$dest_dir"
         else
-            mv $src_filename $dest_dir/$src_rename
+            mv "$src_filename" "$dest_dir/$src_rename"
         fi
     elif [[ "$src_format" == "docker" ]]; then
-        "$YNH_HELPERS_DIR/vendor/docker-image-extract/docker-image-extract" -p $src_platform -o $dest_dir $src_url 2>&1
+        "$YNH_HELPERS_DIR/vendor/docker-image-extract/docker-image-extract" -p "$src_platform" -o "$dest_dir" "$src_url" 2>&1
     elif [[ "$src_format" == "zip" ]]; then
         # Zip format
         # Using of a temp directory, because unzip doesn't manage --strip-components
         if $src_in_subdir; then
             local tmp_dir=$(mktemp --directory)
-            unzip -quo $src_filename -d "$tmp_dir"
-            cp --archive $tmp_dir/*/. "$dest_dir"
+            unzip -quo "$src_filename" -d "$tmp_dir"
+            cp --archive "$tmp_dir"/*/. "$dest_dir"
             ynh_safe_rm "$tmp_dir"
         else
-            unzip -quo $src_filename -d "$dest_dir"
+            unzip -quo "$src_filename" -d "$dest_dir"
         fi
         ynh_safe_rm "$src_filename"
     else
@@ -221,7 +221,7 @@ ynh_setup_source() {
             strip="--strip-components $sub_dirs"
         fi
         if [[ "$src_format" =~ ^tar.gz|tar.bz2|tar.xz|tar$ ]]; then
-            tar --extract --file=$src_filename --directory="$dest_dir" $strip
+            tar --extract --file="$src_filename" --directory="$dest_dir" "$strip"
         else
             ynh_die "Archive format unrecognized."
         fi
@@ -266,6 +266,6 @@ ynh_setup_source() {
     rm -rf /var/cache/yunohost/files_to_keep_during_setup_source/
 
     if [ -n "${install_dir:-}" ] && [ "$dest_dir" == "$install_dir" ]; then
-        _ynh_apply_default_permissions $dest_dir
+        _ynh_apply_default_permissions "$dest_dir"
     fi
 }

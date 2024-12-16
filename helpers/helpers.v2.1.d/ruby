@@ -159,24 +159,24 @@ ynh_ruby_install() {
     test -x /usr/bin/ruby_rbenv && mv /usr/bin/ruby_rbenv /usr/bin/ruby
 
     # Install the requested version of Ruby
-    local final_ruby_version=$(rbenv latest --print $ruby_version)
+    local final_ruby_version=$(rbenv latest --print "$ruby_version")
     if ! [ -n "$final_ruby_version" ]; then
         final_ruby_version=$ruby_version
     fi
     echo "Installing Ruby $final_ruby_version"
-    RUBY_CONFIGURE_OPTS="--disable-install-doc --with-jemalloc" MAKE_OPTS="-j2" rbenv install --skip-existing $final_ruby_version > /dev/null 2>&1
+    RUBY_CONFIGURE_OPTS="--disable-install-doc --with-jemalloc" MAKE_OPTS="-j2" rbenv install --skip-existing "$final_ruby_version" > /dev/null 2>&1
 
     # Store ruby_version into the config of this app
-    ynh_app_setting_set --key=ruby_version --value=$final_ruby_version
-    ruby_version=$final_ruby_version
+    ynh_app_setting_set --key=ruby_version --value="$final_ruby_version"
+    ruby_version="$final_ruby_version"
 
     # Remove app virtualenv
     if rbenv alias --list | grep --quiet "$app "; then
-        rbenv alias $app --remove
+        rbenv alias "$app" --remove
     fi
 
     # Create app virtualenv
-    rbenv alias $app $final_ruby_version
+    rbenv alias "$app" "$final_ruby_version"
 
     # Cleanup Ruby versions
     _ynh_ruby_cleanup
@@ -209,7 +209,7 @@ ynh_ruby_remove() {
     # Remove /usr/local/bin in PATH in case of Ruby prior installation
     PATH=$(echo $CLEAR_PATH | sed 's@/usr/local/bin:@@')
 
-    rbenv alias $app --remove
+    rbenv alias "$app" --remove
 
     # Remove the line for this app
     ynh_app_setting_delete --key=ruby_version
@@ -231,7 +231,7 @@ _ynh_ruby_cleanup() {
     local installed_apps=$(yunohost app list | grep -oP 'id: \K.*$')
     local required_ruby_versions=""
     for installed_app in $installed_apps; do
-        local installed_app_ruby_version=$(ynh_app_setting_get --app=$installed_app --key="ruby_version")
+        local installed_app_ruby_version=$(ynh_app_setting_get --app="$installed_app" --key="ruby_version")
         if [[ -n "$installed_app_ruby_version" ]]; then
             required_ruby_versions="${installed_app_ruby_version}\n${required_ruby_versions}"
         fi
@@ -240,9 +240,9 @@ _ynh_ruby_cleanup() {
     # Remove no more needed Ruby versions
     local installed_ruby_versions=$(rbenv versions --bare --skip-aliases | grep -Ev '/')
     for installed_ruby_version in $installed_ruby_versions; do
-        if ! echo ${required_ruby_versions} | grep -q "${installed_ruby_version}"; then
+        if ! echo "$required_ruby_versions" | grep -q "${installed_ruby_version}"; then
             echo "Removing Ruby-$installed_ruby_version"
-            $RBENV_INSTALL_DIR/bin/rbenv uninstall --force $installed_ruby_version
+            $RBENV_INSTALL_DIR/bin/rbenv uninstall --force "$installed_ruby_version"
         fi
     done
 
@@ -257,8 +257,8 @@ _ynh_ruby_cleanup() {
 
 _ynh_ruby_try_bash_extension() {
     if [ -x src/configure ]; then
-        src/configure && make -C src 2>&1 || {
+        if ! (src/configure && make -C src 2>&1); then
             ynh_print_info "Optional bash extension failed to build, but things will still work normally."
-        }
+        fi
     fi
 }

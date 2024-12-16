@@ -29,7 +29,7 @@ _ynh_app_config_get_one() {
         formats[${short_setting}]="yaml"
 
     elif [[ "$bind" == *"("* ]] && type -t "get__${bind%%(*}" 2> /dev/null | grep -q '^function$' 2> /dev/null; then
-        old[$short_setting]="$("get__${bind%%(*}" $short_setting $type $bind)"
+        old[$short_setting]="$("get__${bind%%(*}" "$short_setting" "$type" "$bind")"
         formats[${short_setting}]="yaml"
 
     elif [[ "$bind" == "null" ]]; then
@@ -46,7 +46,7 @@ _ynh_app_config_get_one() {
     # Get multiline text from settings or from a full file
     elif [[ "$type" == "text" ]]; then
         if [[ "$bind" == "settings" ]]; then
-            old[$short_setting]="$(ynh_app_setting_get $app $short_setting)"
+            old[$short_setting]="$(ynh_app_setting_get "$app" "$short_setting")"
         elif [[ "$bind" == *":"* ]]; then
             ynh_die "For technical reasons, multiline text '${short_setting}' can't be stored automatically  in a variable file, you have to create custom getter/setter"
         else
@@ -77,11 +77,11 @@ _ynh_app_config_apply_one() {
     local type="${types[$short_setting]}"
     if [ "${changed[$short_setting]}" == "true" ]; then
         # Apply setter if exists
-        if type -t $setter 2> /dev/null | grep -q '^function$' 2> /dev/null; then
-            $setter
+        if type -t "$setter" 2> /dev/null | grep -q '^function$' 2> /dev/null; then
+            "$setter"
 
         elif [[ "$bind" == *"("* ]] && type -t "set__${bind%%(*}" 2> /dev/null | grep -q '^function$' 2> /dev/null; then
-            "set__${bind%%(*}" $short_setting $type $bind
+            "set__${bind%%(*}" "$short_setting" "$type" "$bind"
 
         elif [[ "$bind" == "null" ]]; then
             return
@@ -110,7 +110,7 @@ _ynh_app_config_apply_one() {
 
         # Save value in app settings
         elif [[ "$bind" == "settings" ]]; then
-            ynh_app_setting_set --key=$short_setting --value="${!short_setting}"
+            ynh_app_setting_set --key="$short_setting" --value="${!short_setting}"
             ynh_print_info "Configuration key '$short_setting' edited in app settings"
 
         # Save multiline text in a file
@@ -144,7 +144,7 @@ _ynh_app_config_apply_one() {
             fi
 
             # We stored the info in settings in order to be able to upgrade the app
-            ynh_app_setting_set --key=$short_setting --value="${!short_setting}"
+            ynh_app_setting_set --key="$short_setting" --value="${!short_setting}"
             ynh_print_info "Configuration key '$bind_key_' edited into $bind_file"
 
         fi
@@ -159,13 +159,13 @@ _ynh_app_config_get() {
         types[${short_setting}]="$type"
         file_hash[${short_setting}]=""
         formats[${short_setting}]=""
-        ynh_app_config_get_one $short_setting $type $bind
+        ynh_app_config_get_one "$short_setting" "$type" "$bind"
     done
 }
 
 _ynh_app_config_apply() {
     for short_setting in "${!old[@]}"; do
-        ynh_app_config_apply_one $short_setting
+        ynh_app_config_apply_one "$short_setting"
     done
 }
 
@@ -230,10 +230,10 @@ _ynh_app_config_validate() {
     for short_setting in "${!old[@]}"; do
         [[ "${changed[$short_setting]}" == "false" ]] && continue
         local result=""
-        if type -t validate__$short_setting | grep -q '^function$' 2> /dev/null; then
-            result="$(validate__$short_setting)"
+        if type -t "validate__$short_setting" | grep -q '^function$' 2> /dev/null; then
+            result="$("validate__$short_setting")"
         elif [[ "$bind" == *"("* ]] && type -t "validate__${bind%%(*}" 2> /dev/null | grep -q '^function$' 2> /dev/null; then
-            "validate__${bind%%(*}" $short_setting
+            "validate__${bind%%(*}" "$short_setting"
         fi
         if [ -n "$result" ]; then
             #
@@ -262,7 +262,7 @@ _ynh_app_config_validate() {
 }
 
 ynh_app_config_get_one() {
-    _ynh_app_config_get_one $1 $2 $3
+    _ynh_app_config_get_one "$1" "$2" "$3"
 }
 
 ynh_app_config_get() {
@@ -278,7 +278,7 @@ ynh_app_config_validate() {
 }
 
 ynh_app_config_apply_one() {
-    _ynh_app_config_apply_one $1
+    _ynh_app_config_apply_one "$1"
 }
 ynh_app_config_apply() {
     _ynh_app_config_apply
@@ -321,7 +321,7 @@ ynh_app_config_run() {
             ynh_script_progression "Configuration of $app completed"
             ;;
         *)
-            ynh_app_action_run $1
+            ynh_app_action_run "$1"
             ;;
     esac
 }

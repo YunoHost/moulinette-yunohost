@@ -90,27 +90,27 @@ ynh_nodejs_install() {
     # Install the requested version of nodejs
     uname=$(uname --machine)
     if [[ $uname =~ aarch64 || $uname =~ arm64 ]]; then
-        n $nodejs_version --arch=arm64
+        n "$nodejs_version" --arch=arm64
     else
-        n $nodejs_version
+        n "$nodejs_version"
     fi
 
     # Find the last "real" version for this major version of node.
-    real_nodejs_version=$(find $N_INSTALL_DIR/n/versions/node/$nodejs_version* -maxdepth 0 | sort --version-sort | tail --lines=1)
-    real_nodejs_version=$(basename $real_nodejs_version)
+    real_nodejs_version=$(find "$N_INSTALL_DIR/n/versions/node/$nodejs_version"* -maxdepth 0 | sort --version-sort | tail --lines=1)
+    real_nodejs_version=$(basename "$real_nodejs_version")
 
     # Create a symbolic link for this major version if the file doesn't already exist
     if [ ! -e "$N_INSTALL_DIR/n/versions/node/$nodejs_version" ]; then
         ln --symbolic --force --no-target-directory \
-            $N_INSTALL_DIR/n/versions/node/$real_nodejs_version \
-            $N_INSTALL_DIR/n/versions/node/$nodejs_version
+            "$N_INSTALL_DIR/n/versions/node/$real_nodejs_version" \
+            "$N_INSTALL_DIR/n/versions/node/$nodejs_version"
     fi
 
     # Store the ID of this app and the version of node requested for it
     echo "$YNH_APP_INSTANCE_NAME:$nodejs_version" | tee --append "$N_INSTALL_DIR/ynh_app_version"
 
     # Store nodejs_version into the config of this app
-    ynh_app_setting_set --key=nodejs_version --value=$nodejs_version
+    ynh_app_setting_set --key=nodejs_version --value="$nodejs_version"
 
     _ynh_load_nodejs_in_path_and_other_tweaks
 }
@@ -131,7 +131,7 @@ ynh_nodejs_remove() {
 
     # If no other app uses this version of nodejs, remove it.
     if ! grep --quiet "$nodejs_version" "$N_INSTALL_DIR/ynh_app_version"; then
-        $N_INSTALL_DIR/bin/n rm $nodejs_version
+        "$N_INSTALL_DIR/bin/n" rm "$nodejs_version"
     fi
 
     # If no other app uses n, remove n

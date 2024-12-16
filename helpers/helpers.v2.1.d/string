@@ -117,7 +117,7 @@ ynh_sanitize_dbid() {
     # ===========================================
 
     # We should avoid having - and . in the name of databases. They are replaced by _
-    echo ${db_name//[-.]/_}
+    echo "${db_name//[-.]/_}"
 }
 
 # Normalize the url path syntax
@@ -143,5 +143,5 @@ ynh_normalize_url_path() {
     if [ "${path_url:${#path_url}-1}" == "/" ] && [ ${#path_url} -gt 1 ]; then # If the last character is a / and that not the only character.
         path_url="${path_url:0:${#path_url}-1}"                                # Delete the last character
     fi
-    echo $path_url
+    echo "$path_url"
 }

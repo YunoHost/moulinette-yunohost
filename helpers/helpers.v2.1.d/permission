@@ -115,8 +115,8 @@ ynh_permission_create() {
         additional_urls=",additional_urls=['${additional_urls//;/\',\'}']"
     fi
 
-    if [[ -n $auth_header ]]; then
-        if [ $auth_header == "true" ]; then
+    if [[ -n "$auth_header" ]]; then
+        if [ "$auth_header" == "true" ]; then
             auth_header=",auth_header=True"
         else
             auth_header=",auth_header=False"
@@ -139,16 +139,16 @@ ynh_permission_create() {
         label=",label='$permission'"
     fi
 
-    if [[ -n ${show_tile:-} ]]; then
-        if [ $show_tile == "true" ]; then
+    if [[ -n "${show_tile:-}" ]]; then
+        if [ "$show_tile" == "true" ]; then
             show_tile=",show_tile=True"
         else
             show_tile=",show_tile=False"
         fi
     fi
 
-    if [[ -n ${protected:-} ]]; then
-        if [ $protected == "true" ]; then
+    if [[ -n "${protected:-}" ]]; then
+        if [ "$protected" == "true" ]; then
             protected=",protected=True"
         else
             protected=",protected=False"
@@ -241,15 +241,15 @@ ynh_permission_url() {
         remove_url=",remove_url=['${remove_url//;/\',\'}']"
     fi
 
-    if [[ -n $auth_header ]]; then
-        if [ $auth_header == "true" ]; then
+    if [[ -n "$auth_header" ]]; then
+        if [ "$auth_header" == "true" ]; then
             auth_header=",auth_header=True"
         else
             auth_header=",auth_header=False"
         fi
     fi
 
-    if [[ -n $clear_urls ]] && [ $clear_urls -eq 1 ]; then
+    if [[ -n "$clear_urls" ]] && [ "$clear_urls" -eq 1 ]; then
         clear_urls=",clear_urls=True"
     fi
 
@@ -312,14 +312,14 @@ ynh_permission_has_user() {
     ynh_handle_getopts_args "$@"
     # ===========================================
 
-    if ! ynh_permission_exists --permission=$permission; then
+    if ! ynh_permission_exists --permission="$permission"; then
         return 1
     fi
 
     # Check both allowed and corresponding_users sections in the json
     for section in "allowed" "corresponding_users"; do
         if yunohost user permission info "$app.$permission" --output-as json --quiet \
-            | jq -e --arg user $user --arg section $section '.[$section] | index($user)' > /dev/null; then
+            | jq -e --arg user "$user" --arg section $section '.[$section] | index($user)' > /dev/null; then
             return 0
         fi
     done

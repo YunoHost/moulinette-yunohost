@@ -20,7 +20,9 @@
 
 set -e
 
-. /usr/share/yunohost/helpers
+# Source YNH helpers
+# shellcheck source=../../helpers/helpers
+source /usr/share/yunohost/helpers
 
 do_pre_regen() {
     pending_dir=$1
@@ -55,25 +57,25 @@ do_pre_regen() {
         relay_password="$(jq -r '.smtp_relay_password' <<< "$YNH_SETTINGS")"
 
         # Avoid to display "Relay account paswword" to other users
-        touch ${postfix_dir}/sasl_passwd
-        chmod 750 ${postfix_dir}/sasl_passwd
+        touch "${postfix_dir}/sasl_passwd"
+        chmod 750 "${postfix_dir}/sasl_passwd"
         # Avoid "postmap: warning: removing zero-length database file"
-        chown postfix ${pending_dir}/etc/postfix
-        chown postfix ${pending_dir}/etc/postfix/sasl_passwd
+        chown postfix "${pending_dir}/etc/postfix"
+        chown postfix "${pending_dir}/etc/postfix/sasl_passwd"
 
-        cat <<< "[${relay_host}]:${relay_port} ${relay_user}:${relay_password}" > ${postfix_dir}/sasl_passwd
+        cat <<< "[${relay_host}]:${relay_port} ${relay_user}:${relay_password}" > "${postfix_dir}/sasl_passwd"
     fi
 
     # Use this postfix server as a backup MX
     export backup_mx_domains="$(yunohost settings get 'email.smtp.smtp_backup_mx_domains' | sed "s/,/ /g")"
     export backup_mx_emails="$(yunohost settings get 'email.smtp.smtp_backup_mx_emails_whitelisted' | sed "s/,/ /g")"
-    rm -f ${postfix_dir}/relay_recipients
-    touch ${postfix_dir}/relay_recipients
+    rm -f "${postfix_dir}/relay_recipients"
+    touch "${postfix_dir}/relay_recipients"
     if [ -n "${backup_mx_domains}" ] && [ -n "${backup_mx_emails}" ]; then
         for mail in ${backup_mx_emails}; do
-            echo "$mail OK" >> ${postfix_dir}/relay_recipients
+            echo "$mail OK" >> "${postfix_dir}/relay_recipients"
         done
-        postmap ${postfix_dir}/relay_recipients
+        postmap "${postfix_dir}/relay_recipients"
     fi
 
     export main_domain
@@ -123,4 +125,4 @@ do_post_regen() {
 
 }
 
-do_$1_regen ${@:2}
+"do_${1}_regen" "${@:2}"

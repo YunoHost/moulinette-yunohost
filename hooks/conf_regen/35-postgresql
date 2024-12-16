@@ -19,7 +19,10 @@
 #
 
 set -e
-. /usr/share/yunohost/helpers
+
+# Source YNH helpers
+# shellcheck source=../../helpers/helpers
+source /usr/share/yunohost/helpers
 
 if ! dpkg --list | grep -q "ii *postgresql-$PSQL_VERSION "; then
     echo 'postgresql is not installed, skipping'
@@ -41,21 +44,21 @@ do_post_regen() {
     # (N.B. : to check the active state, we check the cluster state because
     # postgresql could be flagged as active even though the cluster is in
     # failed state because of how the service is configured..)
-    systemctl is-active postgresql@$PSQL_VERSION-main -q || ynh_systemd_action --service_name=postgresql --action=restart
+    systemctl is-active "postgresql@$PSQL_VERSION-main" -q || ynh_systemd_action --service_name=postgresql --action=restart
     systemctl is-enabled postgresql -q || systemctl enable postgresql --quiet
 
     # If this is the very first time, we define the root password
     # and configure a few things
-    if [ ! -f "$PSQL_ROOT_PWD_FILE" ] || [ -z "$(cat $PSQL_ROOT_PWD_FILE)" ]; then
-        ynh_string_random > $PSQL_ROOT_PWD_FILE
+    if [ ! -f "$PSQL_ROOT_PWD_FILE" ] || [ -z "$(cat "$PSQL_ROOT_PWD_FILE")" ]; then
+        ynh_string_random > "$PSQL_ROOT_PWD_FILE"
     fi
 
-    [ ! -e $PSQL_ROOT_PWD_FILE ] || {
-        chown root:postgres $PSQL_ROOT_PWD_FILE
-        chmod 440 $PSQL_ROOT_PWD_FILE
-    }
+    if [ -e "$PSQL_ROOT_PWD_FILE" ]; then
+        chown root:postgres "$PSQL_ROOT_PWD_FILE"
+        chmod 440 "$PSQL_ROOT_PWD_FILE"
+    fi
 
-    sudo --login --user=postgres psql -c"ALTER user postgres WITH PASSWORD '$(cat $PSQL_ROOT_PWD_FILE)'" postgres
+    sudo --login --user=postgres psql -c"ALTER user postgres WITH PASSWORD '$(cat "$PSQL_ROOT_PWD_FILE")'" postgres
 
     # force all user to connect to local databases using hashed passwords
     # https://www.postgresql.org/docs/current/static/auth-pg-hba-conf.html#EXAMPLE-PG-HBA.CONF
@@ -67,4 +70,4 @@ do_post_regen() {
     ynh_systemd_action --service_name=postgresql --action=reload
 }
 
-do_$1_regen ${@:2}
+"do_${1}_regen" "${@:2}"

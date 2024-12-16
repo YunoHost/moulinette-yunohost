@@ -33,14 +33,14 @@ _generate_config() {
         echo "    - $domain"
     done
     if [[ -e /etc/yunohost/mdns.aliases ]]; then
-        for localalias in $(cat /etc/yunohost/mdns.aliases | grep -v "^ *$"); do
+        while read -r localalias; do
             echo "    - $localalias.local"
-        done
+        done < <(grep -v "^ *$" /etc/yunohost/mdns.aliases)
     fi
 }
 
 do_init_regen() {
-    do_pre_regen
+    do_pre_regen "$@"
     do_post_regen /etc/systemd/system/yunomdns.service
     systemctl enable yunomdns --quiet
 }
@@ -49,19 +49,20 @@ do_pre_regen() {
     pending_dir="$1"
 
     cd /usr/share/yunohost/conf/mdns
-    mkdir -p ${pending_dir}/etc/systemd/system/
-    cp yunomdns.service ${pending_dir}/etc/systemd/system/
+    mkdir -p "${pending_dir}/etc/systemd/system/"
+    cp yunomdns.service "${pending_dir}/etc/systemd/system/"
 
     getent passwd mdns &> /dev/null || useradd --no-create-home --shell /usr/sbin/nologin --system --user-group mdns
 
-    mkdir -p ${pending_dir}/etc/yunohost
-    _generate_config > ${pending_dir}/etc/yunohost/mdns.yml
+    mkdir -p "${pending_dir}/etc/yunohost"
+    _generate_config > "${pending_dir}/etc/yunohost/mdns.yml"
 }
 
 do_post_regen() {
     regen_conf_files="$1"
 
     chown mdns:mdns /etc/yunohost/mdns.yml
+    chmod 600 /etc/yunohost/mdns.yml
 
     # If we changed the systemd ynh-override conf
     if echo "$regen_conf_files" | sed 's/,/\n/g' | grep -q "^/etc/systemd/system/yunomdns.service$"; then
@@ -78,4 +79,4 @@ do_post_regen() {
         || systemctl restart yunomdns
 }
 
-do_$1_regen ${@:2}
+"do_${1}_regen" "${@:2}"

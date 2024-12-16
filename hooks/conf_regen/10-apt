@@ -28,7 +28,7 @@ do_pre_regen() {
     mkdir --parents "${pending_dir}/etc/apt/preferences.d"
 
     # Add sury
-    mkdir -p ${pending_dir}/etc/apt/sources.list.d/
+    mkdir -p "${pending_dir}/etc/apt/sources.list.d/"
     echo "deb [signed-by=/etc/apt/trusted.gpg.d/extra_php_version.gpg] https://packages.sury.org/php/ $(lsb_release --codename --short) main" > "${pending_dir}/etc/apt/sources.list.d/extra_php_version.list"
 
     # Ban some packages from sury
@@ -95,7 +95,7 @@ do_post_regen() {
 
     # Purge expired keys (such as sury 95BD4743)
     EXPIRED_KEYS="$(LC_ALL='en_US.UTF-8' apt-key list 2> /dev/null | grep -A1 'expired:' | grep -v 'expired\|^-' | sed 's/\s//g')"
-    for KEY in $EXPIRED_KEYS; do apt-key del $KEY 2> /dev/null; done
+    for KEY in $EXPIRED_KEYS; do apt-key del "$KEY" 2> /dev/null; done
 
     # Add sury key
     # We do this only at the post regen and if the key doesn't already exists, because we don't want the regenconf to fuck everything up if the regenconf runs while the network is down
@@ -114,4 +114,4 @@ do_post_regen() {
     fi
 }
 
-do_$1_regen ${@:2}
+"do_${1}_regen" "${@:2}"
