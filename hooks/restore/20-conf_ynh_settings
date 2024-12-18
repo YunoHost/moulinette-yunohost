@@ -18,6 +18,9 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+# Exit hook on subcommand error or unset variable
+set -Eeuo pipefail
+
 backup_dir="$1/conf/ynh"
 
 cp -a "${backup_dir}/current_host" /etc/yunohost/current_host

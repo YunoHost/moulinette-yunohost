@@ -19,9 +19,10 @@
 #
 
 # Exit hook on subcommand error or unset variable
-set -eu
+set -Eeuo pipefail
 
 # Source YNH helpers
+# shellcheck source=../../helpers/helpers
 source /usr/share/yunohost/helpers
 
 backup_dir="data/multimedia"
