@@ -18,15 +18,16 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-set -e
+# Exit hook on subcommand error or unset variable
+set -Eeuo pipefail
 
 _generate_config() {
     echo "domains:"
     # Add yunohost.local (only if yunohost.local ain't already in ynh_domains)
-    if ! echo "$YNH_DOMAINS" | tr ' ' '\n' | grep -q --line-regexp 'yunohost.local'; then
+    if ! echo "${YNH_DOMAINS:-}" | tr ' ' '\n' | grep -q --line-regexp 'yunohost.local'; then
         echo "    - yunohost.local"
     fi
-    for domain in $YNH_DOMAINS; do
+    for domain in ${YNH_DOMAINS:-}; do
         # Only keep .local domains (don't keep
         [[ "$domain" =~ [^.]+\.[^.]+\.local$ ]] && echo "Subdomain $domain cannot be handled by Bonjour/Zeroconf/mDNS" >&2
         [[ "$domain" =~ ^[^.]+\.local$ ]] || continue
@@ -40,7 +41,7 @@ _generate_config() {
 }
 
 do_init_regen() {
-    do_pre_regen
+    do_pre_regen ""
     do_post_regen /etc/systemd/system/yunomdns.service
     systemctl enable yunomdns --quiet
 }
@@ -49,13 +50,13 @@ do_pre_regen() {
     pending_dir="$1"
 
     cd /usr/share/yunohost/conf/mdns
-    mkdir -p ${pending_dir}/etc/systemd/system/
-    cp yunomdns.service ${pending_dir}/etc/systemd/system/
+    mkdir -p "${pending_dir}/etc/systemd/system/"
+    cp yunomdns.service "${pending_dir}/etc/systemd/system/"
 
     getent passwd mdns &> /dev/null || useradd --no-create-home --shell /usr/sbin/nologin --system --user-group mdns
 
-    mkdir -p ${pending_dir}/etc/yunohost
-    _generate_config > ${pending_dir}/etc/yunohost/mdns.yml
+    mkdir -p "$pending_dir/etc/yunohost"
+    _generate_config > "$pending_dir/etc/yunohost/mdns.yml"
 }
 
 do_post_regen() {
@@ -78,4 +79,4 @@ do_post_regen() {
         || systemctl restart yunomdns
 }
 
-do_$1_regen ${@:2}
+"do_$1_regen" "${@:2}"
