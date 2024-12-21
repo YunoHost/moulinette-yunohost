@@ -51,8 +51,9 @@ do_post_regen() {
         chmod 644 /etc/fail2ban/jail.d/*.conf
     fi
 
-    [[ -z "$regen_conf_files" ]] \
-        || systemctl reload fail2ban
+    if [[ -n "$regen_conf_files" ]]; then
+        systemctl reload fail2ban
+    fi
 }
 
 "do_$1_regen" "${@:2}"

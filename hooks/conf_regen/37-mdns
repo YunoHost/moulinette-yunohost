@@ -53,7 +53,9 @@ do_pre_regen() {
     mkdir -p "${pending_dir}/etc/systemd/system/"
     cp yunomdns.service "${pending_dir}/etc/systemd/system/"
 
-    getent passwd mdns &> /dev/null || useradd --no-create-home --shell /usr/sbin/nologin --system --user-group mdns
+    if ! getent passwd mdns &>/dev/null; then
+        useradd --no-create-home --shell /usr/sbin/nologin --system --user-group mdns
+    fi
 
     mkdir -p "$pending_dir/etc/yunohost"
     _generate_config > "$pending_dir/etc/yunohost/mdns.yml"
@@ -75,8 +77,9 @@ do_post_regen() {
         sleep 2
     fi
 
-    [[ -z "$regen_conf_files" ]] \
-        || systemctl restart yunomdns
+    if [[ -n "$regen_conf_files" ]]; then
+        systemctl restart yunomdns
+    fi
 }
 
 "do_$1_regen" "${@:2}"
