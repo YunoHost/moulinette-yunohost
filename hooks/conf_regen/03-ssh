@@ -20,7 +20,9 @@
 
 set -e
 
-. /usr/share/yunohost/helpers
+# Source YNH helpers
+# shellcheck source=../../helpers/helpers
+source /usr/share/yunohost/helpers
 
 do_pre_regen() {
     pending_dir=$1
@@ -44,6 +46,7 @@ do_post_regen() {
     regen_conf_files=$1
 
     # If no file changed, there's nothing to do
+
     [[ -n "$regen_conf_files" ]] || return 0
 
     # Enforce permissions for /etc/ssh/sshd_config
@@ -53,4 +56,4 @@ do_post_regen() {
     systemctl restart ssh
 }
 
-do_$1_regen ${@:2}
+"do_$1_regen" "${@:2}"
