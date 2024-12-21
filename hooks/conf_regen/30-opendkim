@@ -59,4 +59,4 @@ do_post_regen() {
     systemctl restart opendkim
 }
 
-"do_$1_regen" "${@:2}"
+"do_$1_regen" "${*:2}"

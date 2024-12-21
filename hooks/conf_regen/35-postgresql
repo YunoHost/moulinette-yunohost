@@ -73,4 +73,4 @@ do_post_regen() {
     ynh_systemd_action --service_name=postgresql --action=reload
 }
 
-"do_$1_regen" "${@:2}"
+"do_$1_regen" "${*:2}"

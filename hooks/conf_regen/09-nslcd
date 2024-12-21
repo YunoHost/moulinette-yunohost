@@ -41,4 +41,4 @@ do_post_regen() {
         || systemctl restart nslcd
 }
 
-"do_$1_regen" "${@:2}"
+"do_$1_regen" "${*:2}"
