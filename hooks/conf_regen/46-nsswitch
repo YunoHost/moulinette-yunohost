@@ -18,7 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-set -e
+# Exit hook on subcommand error or unset variable
+set -Eeuo pipefail
 
 do_init_regen() {
     do_pre_regen ""
@@ -30,14 +31,15 @@ do_pre_regen() {
 
     cd /usr/share/yunohost/conf/nsswitch
 
-    install -D -m 644 nsswitch.conf "${pending_dir}/etc/nsswitch.conf"
+    install -D -m 644 nsswitch.conf "$pending_dir/etc/nsswitch.conf"
 }
 
 do_post_regen() {
     regen_conf_files=$1
 
-    [[ -z "$regen_conf_files" ]] \
-        || systemctl restart unscd
+    if [[ -n "$regen_conf_files" ]]; then
+        systemctl restart unscd
+    fi
 }
 
-do_$1_regen ${@:2}
+"do_$1_regen" "${@:2}"

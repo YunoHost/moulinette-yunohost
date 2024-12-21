@@ -18,14 +18,15 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-set -e
+# Exit hook on subcommand error or unset variable
+set -Eeuo pipefail
 
 do_pre_regen() {
     pending_dir=$1
 
     cd /usr/share/yunohost/conf/opendkim
 
-    install -D -m 644 opendkim.conf "${pending_dir}/etc/opendkim.conf"
+    install -D -m 644 opendkim.conf "$pending_dir/etc/opendkim.conf"
 }
 
 do_post_regen() {
@@ -39,14 +40,14 @@ do_post_regen() {
     domain_list="$(yunohost domain list --features mail_in mail_out --output-as json | jq -r ".domains[]" | tr '\n' ' ')"
     for domain in $domain_list; do
         domain_key="/etc/dkim/${domain}.mail.key"
-        [ ! -f "$domain_key" ] && {
+        if [ ! -f "$domain_key" ]; then
             # We use a 1024 bit size because nsupdate doesn't seem to be able to
             # handle 2048...
             opendkim-genkey --domain="$domain" \
                 --selector=mail --directory=/etc/dkim -b 1024
             mv /etc/dkim/mail.private "$domain_key"
             mv /etc/dkim/mail.txt "/etc/dkim/${domain}.mail.txt"
-        }
+        fi
 
         echo "mail._domainkey.${domain} ${domain}:mail:${domain_key}" >> /etc/dkim/keytable
         echo "*@$domain mail._domainkey.${domain}" >> /etc/dkim/signingtable
@@ -58,4 +59,4 @@ do_post_regen() {
     systemctl restart opendkim
 }
 
-do_$1_regen ${@:2}
+"do_$1_regen" "${@:2}"
