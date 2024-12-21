@@ -18,7 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-set -e
+# Exit hook on subcommand error or unset variable
+set -Eeuo pipefail
 
 base_folder_and_perm_init() {
 
@@ -226,26 +227,26 @@ do_pre_regen() {
 
     cd /usr/share/yunohost/conf/yunohost
 
-    mkdir -p $pending_dir/etc/systemd/system
-    mkdir -p $pending_dir/etc/cron.d/
-    mkdir -p $pending_dir/etc/cron.daily/
+    mkdir -p "$pending_dir/etc/systemd/system"
+    mkdir -p "$pending_dir/etc/cron.d/"
+    mkdir -p "$pending_dir/etc/cron.daily/"
 
     # add cron job for diagnosis to be ran at 7h and 19h + a random delay between
     # 0 and 20min, meant to avoid every instances running their diagnosis at
     # exactly the same time, which may overload the diagnosis server.
-    cat > $pending_dir/etc/cron.d/yunohost-diagnosis << EOF
+    cat > "$pending_dir/etc/cron.d/yunohost-diagnosis" << EOF
 SHELL=/bin/bash
 0 7,19 * * * root : YunoHost Automatic Diagnosis; sleep \$((RANDOM\\%1200)); yunohost diagnosis run --email > /dev/null 2>/dev/null || echo "Running the automatic diagnosis failed miserably"
 EOF
 
     # Cron job that upgrade the app list everyday
-    cat > $pending_dir/etc/cron.daily/yunohost-fetch-apps-catalog << EOF
+    cat > "$pending_dir/etc/cron.daily/yunohost-fetch-apps-catalog" << EOF
 #!/bin/bash
 sleep \$((RANDOM%3600)); yunohost tools update apps > /dev/null
 EOF
 
     # Cron job that renew lets encrypt certificates if there's any that needs renewal
-    cat > $pending_dir/etc/cron.daily/yunohost-certificate-renew << EOF
+    cat > "$pending_dir/etc/cron.daily/yunohost-certificate-renew" << EOF
 #!/bin/bash
 yunohost domain cert renew --email
 EOF
@@ -254,7 +255,7 @@ EOF
     # - delay between 0 and 60 secs to spread the check over a 1 min window
     # - do not run the command if some process already has the lock, to avoid queuing hundreds of commands...
     if ls -l /etc/yunohost/dyndns/K*.key 2> /dev/null; then
-        cat > $pending_dir/etc/cron.d/yunohost-dyndns << EOF
+        cat > "$pending_dir/etc/cron.d/yunohost-dyndns" << EOF
 SHELL=/bin/bash
 # Every 10 minutes,
 #   - (sleep random 60 is here to spread requests over a 1-min window)
@@ -265,13 +266,13 @@ SHELL=/bin/bash
 EOF
     else
         # (Delete cron if no dyndns domain found)
-        touch $pending_dir/etc/cron.d/yunohost-dyndns
+        touch "$pending_dir/etc/cron.d/yunohost-dyndns"
     fi
 
     # Skip ntp if inside a container (inspired from the conf of systemd-timesyncd)
     if systemctl | grep -q 'ntp.service'; then
-        mkdir -p ${pending_dir}/etc/systemd/system/ntp.service.d/
-        cat > ${pending_dir}/etc/systemd/system/ntp.service.d/ynh-override.conf << EOF
+        mkdir -p "$pending_dir/etc/systemd/system/ntp.service.d/"
+        cat > "$pending_dir/etc/systemd/system/ntp.service.d/ynh-override.conf" << EOF
 [Unit]
 ConditionCapability=CAP_SYS_TIME
 ConditionVirtualization=!container
@@ -279,8 +280,8 @@ EOF
     fi
 
     # Make nftable conflict with yunohost-firewall
-    mkdir -p ${pending_dir}/etc/systemd/system/nftables.service.d/
-    cat > ${pending_dir}/etc/systemd/system/nftables.service.d/ynh-override.conf << EOF
+    mkdir -p "$pending_dir/etc/systemd/system/nftables.service.d/"
+    cat > "$pending_dir/etc/systemd/system/nftables.service.d/ynh-override.conf" << EOF
 [Unit]
 # yunohost-firewall and nftables conflict with each other
 Conflicts=yunohost-firewall.service
@@ -289,22 +290,22 @@ ConditionPathExists=!/etc/systemd/system/multi-user.target.wants/yunohost-firewa
 EOF
 
     # Don't suspend computer on LidSwitch
-    mkdir -p ${pending_dir}/etc/systemd/logind.conf.d/
-    cat > ${pending_dir}/etc/systemd/logind.conf.d/ynh-override.conf << EOF
+    mkdir -p "$pending_dir/etc/systemd/logind.conf.d/"
+    cat > "$pending_dir/etc/systemd/logind.conf.d/ynh-override.conf" << EOF
 [Login]
 HandleLidSwitch=ignore
 HandleLidSwitchDocked=ignore
 HandleLidSwitchExternalPower=ignore
 EOF
 
-    cp yunohost-api.service ${pending_dir}/etc/systemd/system/yunohost-api.service
-    cp yunohost-portal-api.service ${pending_dir}/etc/systemd/system/yunohost-portal-api.service
-    cp yunohost-firewall.service ${pending_dir}/etc/systemd/system/yunohost-firewall.service
-    cp yunoprompt.service ${pending_dir}/etc/systemd/system/yunoprompt.service
-    cp proc-hidepid.service ${pending_dir}/etc/systemd/system/proc-hidepid.service
+    cp yunohost-api.service "$pending_dir/etc/systemd/system/yunohost-api.service"
+    cp yunohost-portal-api.service "$pending_dir/etc/systemd/system/yunohost-portal-api.service"
+    cp yunohost-firewall.service "$pending_dir/etc/systemd/system/yunohost-firewall.service"
+    cp yunoprompt.service "$pending_dir/etc/systemd/system/yunoprompt.service"
+    cp proc-hidepid.service "$pending_dir/etc/systemd/system/proc-hidepid.service"
 
-    mkdir -p ${pending_dir}/etc/dpkg/origins/
-    cp dpkg-origins ${pending_dir}/etc/dpkg/origins/yunohost
+    mkdir -p "$pending_dir/etc/dpkg/origins/"
+    cp dpkg-origins "$pending_dir/etc/dpkg/origins/yunohost"
 
     # Remove legacy hackish/clumsy nodejs autoupdate which ends up filling up space with ambiguous upgrades >_>
     touch "/etc/cron.daily/node_update"
@@ -342,7 +343,7 @@ do_post_regen() {
     find /etc/cron.*/yunohost-* -type f -exec chown root:root {} \;
 
     for USER in $(yunohost user list --quiet --output-as json | jq -r '.users | .[] | .username'); do
-        [ ! -e "/home/$USER" ] || setfacl -m g:all_users:--- /home/$USER
+        [ ! -e "/home/$USER" ] || setfacl -m g:all_users:--- "/home/$USER"
     done
 
     # Misc configuration / state files
@@ -373,12 +374,12 @@ do_post_regen() {
     if [[ "$regen_conf_files" =~ "yunoprompt.service" ]]; then
         systemctl daemon-reload
         action=$([[ -e /etc/systemd/system/yunoprompt.service ]] && echo 'enable' || echo 'disable')
-        systemctl $action yunoprompt --quiet --now
+        systemctl "$action" yunoprompt --quiet --now
     fi
     if [[ "$regen_conf_files" =~ "proc-hidepid.service" ]]; then
         systemctl daemon-reload
         action=$([[ -e /etc/systemd/system/proc-hidepid.service ]] && echo 'enable' || echo 'disable')
-        systemctl $action proc-hidepid --quiet --now
+        systemctl "$action" proc-hidepid --quiet --now
     fi
 
     systemctl enable yunohost-portal-api.service --quiet
@@ -396,4 +397,4 @@ do_post_regen() {
     fi
 }
 
-do_$1_regen ${@:2}
+"do_$1_regen" "${@:2}"
