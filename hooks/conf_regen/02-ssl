@@ -18,7 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-set -e
+# Exit hook on subcommand error or unset variable
+set -Eeuo pipefail
 
 ssl_dir="/usr/share/yunohost/ssl"
 template_dir="/usr/share/yunohost/conf/ssl"
@@ -54,7 +55,7 @@ regen_local_ca() {
         -keyout ca/cakey.pem \
         -nodes \
         -batch \
-        -subj /CN=${domain}/O=${domain%.*} 2>&1
+        -subj "/CN=${domain}/O=${domain%.*}" 2>&1
 
     chmod 640 ca/cacert.pem
     chmod 640 ca/cakey.pem
@@ -141,11 +142,11 @@ do_post_regen() {
     chmod o+r ${ssl_dir}/certs/yunohost_crt.pem
 
     if [[ "$current_local_ca_domain" != "$main_domain" ]]; then
-        regen_local_ca $main_domain
+        regen_local_ca "$main_domain"
         # Idk how useful this is, but this was in the previous python code (domain.main_domain())
-        ln -sf /etc/yunohost/certs/$main_domain/crt.pem /etc/ssl/certs/yunohost_crt.pem
-        ln -sf /etc/yunohost/certs/$main_domain/key.pem /etc/ssl/private/yunohost_key.pem
+        ln -sf "/etc/yunohost/certs/$main_domain/crt.pem" /etc/ssl/certs/yunohost_crt.pem
+        ln -sf "/etc/yunohost/certs/$main_domain/key.pem" /etc/ssl/private/yunohost_key.pem
     fi
 }
 
-do_$1_regen ${@:2}
+"do_$1_regen" "${@:2}"
