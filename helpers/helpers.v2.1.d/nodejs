@@ -18,15 +18,13 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-readonly N_INSTALL_DIR="/opt/node_n"
-# N_PREFIX is the directory of n, it needs to be loaded as a environment variable.
-export N_PREFIX="$N_INSTALL_DIR"
+readonly export N_PREFIX="/opt/node_n"
 
 # [internal]
 _ynh_load_nodejs_in_path_and_other_tweaks() {
 
     # Get the absolute path of this version of node
-    nodejs_dir="$N_INSTALL_DIR/n/versions/node/$nodejs_version/bin"
+    nodejs_dir="$N_PREFIX/n/versions/node/$nodejs_version/bin"
 
     # Load the path of this version of node in $PATH
     if [[ :$PATH: != *":$nodejs_dir"* ]]; then
@@ -62,52 +60,15 @@ ynh_nodejs_install() {
 
     [[ -n "${nodejs_version:-}" ]] || ynh_die "\$nodejs_version should be defined prior to calling ynh_nodejs_install"
 
-    # Create $N_INSTALL_DIR
-    mkdir --parents "$N_INSTALL_DIR"
-
-    # Load n path in PATH
-    CLEAR_PATH="$N_INSTALL_DIR/bin:$PATH"
-    # Remove /usr/local/bin in PATH in case of node prior installation
-    PATH=$(echo $CLEAR_PATH | sed 's@/usr/local/bin:@@')
-
-    # Move an existing node binary, to avoid to block n.
-    test -x /usr/bin/node && mv /usr/bin/node /usr/bin/node_n
-    test -x /usr/bin/npm && mv /usr/bin/npm /usr/bin/npm_n
-
-    # Install (or update if YunoHost vendor/ folder updated since last install) n
-    mkdir -p $N_INSTALL_DIR/bin/
-    cp "$YNH_HELPERS_DIR/vendor/n/n" $N_INSTALL_DIR/bin/n
-    # Tweak for n to understand it's installed in $N_PREFIX
-    ynh_replace --match="^N_PREFIX=\${N_PREFIX-.*}$" --replace="N_PREFIX=\${N_PREFIX-$N_PREFIX}" --file="$N_INSTALL_DIR/bin/n"
-
-    # Restore /usr/local/bin in PATH
-    PATH=$CLEAR_PATH
-
-    # And replace the old node binary.
-    test -x /usr/bin/node_n && mv /usr/bin/node_n /usr/bin/node
-    test -x /usr/bin/npm_n && mv /usr/bin/npm_n /usr/bin/npm
+    # Create $N_PREFIX
+    mkdir --parents "$N_PREFIX"
 
     # Install the requested version of nodejs
-    uname=$(uname --machine)
-    if [[ $uname =~ aarch64 || $uname =~ arm64 ]]; then
-        n $nodejs_version --arch=arm64
+    if [[ $YNH_ARCH == "arm64" ]]; then
+        "$YNH_HELPERS_DIR/vendor/n/n" install $nodejs_version --arch=arm64
     else
-        n $nodejs_version
+        "$YNH_HELPERS_DIR/vendor/n/n"  install $nodejs_version
     fi
-
-    # Find the last "real" version for this major version of node.
-    real_nodejs_version=$(find $N_INSTALL_DIR/n/versions/node/$nodejs_version* -maxdepth 0 | sort --version-sort | tail --lines=1)
-    real_nodejs_version=$(basename $real_nodejs_version)
-
-    # Create a symbolic link for this major version if the file doesn't already exist
-    if [ ! -e "$N_INSTALL_DIR/n/versions/node/$nodejs_version" ]; then
-        ln --symbolic --force --no-target-directory \
-            $N_INSTALL_DIR/n/versions/node/$real_nodejs_version \
-            $N_INSTALL_DIR/n/versions/node/$nodejs_version
-    fi
-
-    # Store the ID of this app and the version of node requested for it
-    echo "$YNH_APP_INSTANCE_NAME:$nodejs_version" | tee --append "$N_INSTALL_DIR/ynh_app_version"
 
     # Store nodejs_version into the config of this app
     ynh_app_setting_set --key=nodejs_version --value=$nodejs_version
@@ -126,17 +87,21 @@ ynh_nodejs_remove() {
 
     [[ -n "${nodejs_version:-}" ]] || ynh_die "\$nodejs_version should be defined prior to calling ynh_nodejs_remove"
 
-    # Remove the line for this app
-    sed --in-place "/$YNH_APP_INSTANCE_NAME:$nodejs_version/d" "$N_INSTALL_DIR/ynh_app_version"
+    ynh_app_setting_delete --key=nodejs_version
 
-    # If no other app uses this version of nodejs, remove it.
-    if ! grep --quiet "$nodejs_version" "$N_INSTALL_DIR/ynh_app_version"; then
-        $N_INSTALL_DIR/bin/n rm $nodejs_version
-    fi
+    # Garbage-collect unused versions
+    local installed_versions="$(N_PREFIX=/opt/node_n "$YNH_HELPERS_DIR/vendor/n/n" ls | awk -F/ '{print $2}')"
+    for version in $installed_versions
+    do
+        if ! grep -qE "^nodejs_version: '?$version'?" /etc/yunohost/apps/*/settings.yml
+        then
+            "$YNH_HELPERS_DIR/vendor/n/n" rm $version
+        fi
+    done
 
     # If no other app uses n, remove n
-    if [ ! -s "$N_INSTALL_DIR/ynh_app_version" ]; then
-        ynh_safe_rm "$N_INSTALL_DIR"
+    if ! grep -q "^nodejs_version:" /etc/yunohost/apps/*/settings.yml; then
+        ynh_safe_rm "$N_PREFIX"
         sed --in-place "/N_PREFIX/d" /root/.bashrc
     fi
 }

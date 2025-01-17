@@ -138,7 +138,6 @@ ynh_install_ruby() {
         if git remote -v 2> /dev/null | grep "https://github.com/rbenv/rbenv.git"; then
             ynh_print_info --message="Updating rbenv..."
             git pull -q --tags origin master
-            ynh_ruby_try_bash_extension
         else
             ynh_print_info --message="Reinstalling rbenv..."
             cd ..
@@ -148,7 +147,6 @@ ynh_install_ruby() {
             git init -q
             git remote add -f -t master origin https://github.com/rbenv/rbenv.git > /dev/null 2>&1
             git checkout -q -b master origin/master
-            ynh_ruby_try_bash_extension
             rbenv=$rbenv_install_dir/bin/rbenv
         fi
         popd
@@ -158,7 +156,6 @@ ynh_install_ruby() {
         git init -q
         git remote add -f -t master origin https://github.com/rbenv/rbenv.git > /dev/null 2>&1
         git checkout -q -b master origin/master
-        ynh_ruby_try_bash_extension
         rbenv=$rbenv_install_dir/bin/rbenv
         popd
     fi
@@ -222,7 +219,9 @@ ynh_install_ruby() {
         final_ruby_version=$ruby_version
     fi
     ynh_print_info --message="Installing Ruby $final_ruby_version"
-    RUBY_CONFIGURE_OPTS="--disable-install-doc --with-jemalloc" MAKE_OPTS="-j2" rbenv install --skip-existing $final_ruby_version > /dev/null 2>&1
+    RUBY_CONFIGURE_OPTS="--disable-install-doc --with-jemalloc" \
+    MAKE_OPTS="-j2" \
+    rbenv install --skip-existing $final_ruby_version > /dev/null 2>&1
 
     # Store ruby_version into the config of this app
     ynh_app_setting_set --app=$app --key=ruby_version --value=$final_ruby_version
@@ -306,13 +305,5 @@ ynh_cleanup_ruby() {
         ynh_print_info --message="Removing rbenv"
         ynh_secure_remove --file="$rbenv_install_dir"
         ynh_secure_remove --file="/etc/profile.d/rbenv.sh"
-    fi
-}
-
-ynh_ruby_try_bash_extension() {
-    if [ -x src/configure ]; then
-        src/configure && make -C src || {
-            ynh_print_info --message="Optional bash extension failed to build, but things will still work normally."
-        }
     fi
 }
