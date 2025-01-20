@@ -31,6 +31,11 @@ from yunohost.utils.error import YunohostError, YunohostValidationError
 FIREWALL_FILE = "/etc/yunohost/firewall.yml"
 UPNP_CRON_JOB = "/etc/cron.d/yunohost-firewall-upnp"
 
+# A UDP port to use for the SSDP discovery phase of UPNP.
+# Assigned by IANA to "Fujitsu ICL Terminal Emulator Program A", so no-one else is
+# likely to use it (unlike port 1900 which is used by SSDP servers such
+# as miniupnpd)
+SSDP_CLIENT_PORT = 1901
 logger = getLogger("yunohost.firewall")
 
 
@@ -255,7 +260,7 @@ def firewall_reload(skip_upnp=False):
 
     # Retrieve firewall rules and UPnP status
     firewall = firewall_list(raw=True)
-    upnp = firewall_upnp()["enabled"] if not skip_upnp else False
+    upnp = firewall_upnp(no_refresh=True)["enabled"] if not skip_upnp else False
 
     # IPv4
     try:
@@ -357,52 +362,37 @@ def firewall_upnp(action="status", no_refresh=False):
 
     """
     firewall = firewall_list(raw=True)
-    enabled = firewall["uPnP"]["enabled"]
 
-    # Compatibility with previous version
-    if action == "reload":
-        logger.debug("'reload' action is deprecated and will be removed")
-        try:
-            # Remove old cron job
-            os.remove("/etc/cron.d/yunohost-firewall")
-        except Exception:
-            pass
-        action = "status"
-        no_refresh = False
-
-    if action == "status" and no_refresh:
-        # Only return current state
-        return {"enabled": enabled}
-    elif action == "enable" or (enabled and action == "status"):
+    if action == "status":
+        enabled = firewall["uPnP"]["enabled"]
+    elif action == "enable":
         # Add cron job
         with open(UPNP_CRON_JOB, "w+") as f:
             f.write(
-                "*/50 * * * * root "
+                "*/12 * * * * root "
                 "/usr/bin/yunohost firewall upnp status >>/dev/null\n"
             )
-        # Open port 1900 to receive discovery message
-        if 1900 not in firewall["ipv4"]["UDP"]:
-            firewall_allow("UDP", 1900, no_upnp=True, no_reload=True)
-            if not enabled:
-                firewall_reload(skip_upnp=True)
         enabled = True
-    elif action == "disable" or (not enabled and action == "status"):
+    elif action == "disable":
         try:
             # Remove cron job
             os.remove(UPNP_CRON_JOB)
         except Exception:
             pass
         enabled = False
-        if action == "status":
-            no_refresh = True
     else:
         raise YunohostValidationError("action_invalid", action=action)
 
-    # Refresh port mapping using UPnP
+    # Refresh port mapping
+    refresh_success = True
     if not no_refresh:
-        upnpc = miniupnpc.UPnP(localport=1)
+        # Open port to receive discovery message
+        process.run_commands(
+            ["iptables -w -A INPUT -p udp --dport %d -j ACCEPT" % SSDP_CLIENT_PORT],
+            callback=_on_rule_command_error,
+        )
+        upnpc = miniupnpc.UPnP(localport=SSDP_CLIENT_PORT)
         upnpc.discoverdelay = 3000
-
         # Discover UPnP device(s)
         logger.debug("discovering UPnP devices...")
         try:
@@ -413,16 +403,22 @@ def firewall_upnp(action="status", no_refresh=False):
             enabled = False
 
         logger.debug("found %d UPnP device(s)", int(nb_dev))
+        # Close discovery port
+        process.run_commands(
+            ["iptables -w -D INPUT -p udp --dport %d -j ACCEPT" % SSDP_CLIENT_PORT],
+            callback=_on_rule_command_error,
+        )
+
         if nb_dev < 1:
             logger.error(m18n.n("upnp_dev_not_found"))
-            enabled = False
+            refresh_success = False
         else:
             try:
                 # Select UPnP device
                 upnpc.selectigd()
             except Exception:
                 logger.debug("unable to select UPnP device", exc_info=1)
-                enabled = False
+                refresh_success = False
             else:
                 # Iterate over ports
                 for protocol in ["TCP", "UDP"]:
@@ -439,7 +435,7 @@ def firewall_upnp(action="status", no_refresh=False):
                                     upnpc.deleteportmapping(port, protocol)
                                 except Exception:
                                     pass
-                        firewall["uPnP"][protocol + "_TO_CLOSE"] = []
+                        del firewall["uPnP"][protocol + "_TO_CLOSE"]
 
                     for port in firewall["uPnP"][protocol]:
                         if not isinstance(port, int):
@@ -469,34 +465,17 @@ def firewall_upnp(action="status", no_refresh=False):
                             logger.debug(
                                 "unable to add port %d using UPnP", port, exc_info=1
                             )
-                            enabled = False
+                            refresh_success = False
+                if refresh_success:
+                    logger.debug("UPnP port refresh successful")
+                    if action == "enable":
+                        logger.success(m18n.n("upnp_enabled"))
+                    elif action == "disable":
+                        logger.success(m18n.n("upnp_disabled"))
 
-                _update_firewall_file(firewall)
-
-    if enabled != firewall["uPnP"]["enabled"]:
-        firewall = firewall_list(raw=True)
-        firewall["uPnP"]["enabled"] = enabled
-
-        _update_firewall_file(firewall)
-
-        if not no_refresh:
-            # Display success message if needed
-            if action == "enable" and enabled:
-                logger.success(m18n.n("upnp_enabled"))
-            elif action == "disable" and not enabled:
-                logger.success(m18n.n("upnp_disabled"))
-            # Make sure to disable UPnP
-            elif action != "disable" and not enabled:
-                firewall_upnp("disable", no_refresh=True)
-
-    if not enabled and (action == "enable" or 1900 in firewall["ipv4"]["UDP"]):
-        # Close unused port 1900
-        firewall_disallow("UDP", 1900, no_reload=True)
-        if not no_refresh:
-            firewall_reload(skip_upnp=True)
-
-    if action == "enable" and not enabled:
-        raise YunohostError("upnp_port_open_failed")
+    # Save state always (note that refreshing can change the "TO_CLOSE" states)
+    firewall["uPnP"]["enabled"] = enabled
+    _update_firewall_file(firewall)
     return {"enabled": enabled}
 
 
@@ -517,9 +496,6 @@ def firewall_stop():
         os.system("ip6tables -P INPUT ACCEPT")
         os.system("ip6tables -F")
         os.system("ip6tables -X")
-
-    if os.path.exists(UPNP_CRON_JOB):
-        firewall_upnp("disable")
 
 
 def _get_ssh_port(default=22):
