@@ -18,8 +18,11 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+# Exit hook on subcommand error or unset variable
+set -Eeuo pipefail
+
 backup_dir="$1/conf/ynh/certs"
 
 mkdir -p /etc/yunohost/certs/
 
-cp -a $backup_dir/. /etc/yunohost/certs/
+cp -a "$backup_dir/." /etc/yunohost/certs/

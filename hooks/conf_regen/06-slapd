@@ -18,7 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-set -e
+# Exit hook on subcommand error or unset variable
+set -Eeuo pipefail
 
 tmp_backup_dir_file="/root/slapd-backup-dir.txt"
 
@@ -101,13 +102,14 @@ do_pre_regen() {
     rm -f "$tmp_backup_dir_file"
 
     # Define if we need to migrate from hdb to mdb
-    curr_backend=$(grep '^database' /etc/ldap/slapd.conf 2> /dev/null | awk '{print $2}')
-    if [ -e /etc/ldap/slapd.conf ] && [ -n "$curr_backend" ] \
-        && [ $curr_backend != 'mdb' ]; then
-        backup_dir="/var/backups/dc=yunohost,dc=org-${curr_backend}-$(date +%s)"
-        mkdir -p "$backup_dir"
-        slapcat -b dc=yunohost,dc=org -l "${backup_dir}/dc=yunohost-dc=org.ldif"
-        echo "$backup_dir" > "$tmp_backup_dir_file"
+    if [ -e /etc/ldap/slapd.conf ]; then
+        curr_backend=$(grep '^database' /etc/ldap/slapd.conf | awk '{print $2}')
+        if [ "$curr_backend" != 'mdb' ]; then
+            backup_dir="/var/backups/dc=yunohost,dc=org-${curr_backend}-$(date +%s)"
+            mkdir -p "$backup_dir"
+            slapcat -b dc=yunohost,dc=org -l "${backup_dir}/dc=yunohost-dc=org.ldif"
+            echo "$backup_dir" > "$tmp_backup_dir_file"
+        fi
     fi
 
     # create needed directories
@@ -121,8 +123,8 @@ do_pre_regen() {
     cp -a ldap.conf "$ldap_dir"
     cp -a sudo.ldif mailserver.ldif permission.ldif "$schema_dir"
 
-    mkdir -p ${pending_dir}/etc/systemd/system/slapd.service.d/
-    cp systemd-override.conf ${pending_dir}/etc/systemd/system/slapd.service.d/ynh-override.conf
+    mkdir -p "$pending_dir/etc/systemd/system/slapd.service.d/"
+    cp systemd-override.conf "$pending_dir/etc/systemd/system/slapd.service.d/ynh-override.conf"
 
     install -D -m 644 slapd.default "${pending_dir}/etc/default/slapd"
 }
@@ -139,7 +141,9 @@ do_post_regen() {
 
     # Fix weird scenarios where /etc/sudo-ldap.conf doesn't exists (yet is supposed to be
     # created by the sudo-ldap package) : https://github.com/YunoHost/issues/issues/2091
-    [ -e /etc/sudo-ldap.conf ] || ln -s /etc/ldap/ldap.conf /etc/sudo-ldap.conf
+    if [ ! -e /etc/sudo-ldap.conf ]; then
+        ln -s /etc/ldap/ldap.conf /etc/sudo-ldap.conf
+    fi
 
     # If we changed the systemd ynh-override conf
     if echo "$regen_conf_files" | sed 's/,/\n/g' | grep -q "^/etc/systemd/system/slapd.service.d/ynh-override.conf$"; then
@@ -162,19 +166,23 @@ objectClass: top"
         nscd -i group
     fi
 
-    [ -z "$regen_conf_files" ] && exit 0
+    if [ -z "$regen_conf_files" ]; then
+        exit 0
+    fi
 
     # regenerate LDAP config directory from slapd.conf
     echo "Regenerate LDAP config directory from config.ldif"
     _regenerate_slapd_conf
 
     # If there's a backup, re-import its data
-    backup_dir=$(cat "$tmp_backup_dir_file" 2> /dev/null || true)
-    if [[ -n "$backup_dir" && -f "${backup_dir}/dc=yunohost-dc=org.ldif" ]]; then
-        # regenerate LDAP config directory and import database as root
-        echo "Import the database using slapadd"
-        slapadd -F /etc/ldap/slapd.d -b dc=yunohost,dc=org -l "${backup_dir}/dc=yunohost-dc=org.ldif"
-        chown -R openldap:openldap /var/lib/ldap 2>&1
+    if [ -f "$tmp_backup_dir_file" ]; then
+        backup_dir=$(cat "$tmp_backup_dir_file")
+        if [[ -n "$backup_dir" && -f "${backup_dir}/dc=yunohost-dc=org.ldif" ]]; then
+            # regenerate LDAP config directory and import database as root
+            echo "Import the database using slapadd"
+            slapadd -F /etc/ldap/slapd.d -b dc=yunohost,dc=org -l "${backup_dir}/dc=yunohost-dc=org.ldif"
+            chown -R openldap:openldap /var/lib/ldap 2>&1
+        fi
     fi
 
     echo "Running slapdindex"
@@ -184,4 +192,4 @@ objectClass: top"
     systemctl force-reload slapd
 }
 
-do_$1_regen ${@:2}
+"do_$1_regen" "${*:2}"
