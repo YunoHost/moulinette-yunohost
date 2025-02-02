@@ -2,6 +2,7 @@ from logging import getLogger
 
 import dbus
 from _dbus_bindings import PROPERTIES_IFACE
+from yunohost.utils.system import binary_to_human
 
 logger = getLogger("yunohost.storage")
 
@@ -11,20 +12,6 @@ __all__ = ["info", "list"]
 
 UDISK_DRIVE_PATH = "/org/freedesktop/UDisks2/drives/"
 UDISK_DRIVE_IFC = "org.freedesktop.UDisks2.Drive"
-
-
-def _humaize(byte_size):
-    suffixes = "kMGTPEZYRQ"
-
-    byte_size = float(byte_size)
-
-    if byte_size < 1024:
-        return f"{byte_size}B"
-
-    for i, s in enumerate(suffixes, start=2):
-        unit = 1024**i
-        if byte_size <= unit:
-            return f"{(1024 * (byte_size / unit)):.1f} {s}B"
 
 
 def _query_udisks():
@@ -45,7 +32,7 @@ def _disk_infos(name: str, drive: dict, human_readable=False):
         "model": drive["Model"],
         "serial": drive["Serial"],
         "removable": bool(drive["MediaRemovable"]),
-        "size": _humaize(drive["Size"]) if human_readable else drive["Size"],
+        "size": binary_to_human(drive["Size"]) if human_readable else drive["Size"],
     }
 
     if connection_bus := drive["ConnectionBus"]:
@@ -75,15 +62,12 @@ def list(with_info=False, human_readable=False):
     if not with_info:
         return [name for name, _ in _query_udisks()]
 
-    result = {}
+    result = []
 
     for name, drive in _query_udisks():
-        result[name] = _disk_infos(name, drive, human_readable)
+        result.append(_disk_infos(name, drive, human_readable))
 
-    if human_readable and not result:
-        return "No external media found"
-
-    return result
+    return {"disks": result}
 
 
 def info(name, human_readable=False):
