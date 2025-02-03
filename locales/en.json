@@ -837,6 +837,7 @@
     "user_import_nothing_to_do": "No user needs to be imported",
     "user_import_partial_failed": "The users import operation partially failed",
     "user_import_success": "Users successfully imported",
+    "user_import_cannot_edit_or_delete_admins": "Unable to edit or delete '{user}' because user is admin",
     "user_unknown": "Unknown user: {user}",
     "user_update_failed": "Could not update user {user}: {error}",
     "user_updated": "User info changed",

@@ -1900,7 +1900,7 @@ def _get_AppConfigPanel():
         entity_type = "app"
         save_path_tpl = os.path.join(APPS_SETTING_PATH, "{entity}/settings.yml")
         config_path_tpl = os.path.join(APPS_SETTING_PATH, "{entity}/config_panel.toml")
-        settings_must_be_defined: bool = True
+        settings_must_be_defined = True
 
         def _get_raw_settings(self) -> "RawSettings":
             return self._call_config_script("show")

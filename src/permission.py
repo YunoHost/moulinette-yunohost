@@ -583,10 +583,10 @@ def permission_url(
         ldap.update(
             f"cn={permission},ou=permission",
             {
-                "URL": [url] if url is not None else [],
+                "URL": url if url is not None else set(),
                 "additionalUrls": new_additional_urls,
-                "authHeader": [str(auth_header).upper()],
-                "showTile": [str(show_tile).upper()],
+                "authHeader": str(auth_header).upper(),
+                "showTile": str(show_tile).upper(),
             },
         )
     except Exception as e:
@@ -674,9 +674,9 @@ def permission_sync_to_user():
             continue
 
         new_inherited_perms = {
-            "inheritPermission": [
+            "inheritPermission": {
                 f"uid={u},ou=users,dc=yunohost,dc=org" for u in should_be_allowed_users
-            ],
+            },
             "memberUid": should_be_allowed_users,
         }
 
@@ -731,15 +731,15 @@ def _update_ldap_group_permission(
         allowed = [allowed] if not isinstance(allowed, list) else allowed
         # Guarantee uniqueness of values in allowed, which would otherwise make ldap.update angry.
         allowed = set(allowed)
-        update["groupPermission"] = [
+        update["groupPermission"] = {
             "cn=" + g + ",ou=groups,dc=yunohost,dc=org" for g in allowed
-        ]
+        }
 
     if label is not None:
-        update["label"] = [str(label)]
+        update["label"] = str(label)
 
     if protected is not None:
-        update["isProtected"] = [str(protected).upper()]
+        update["isProtected"] = str(protected).upper()
 
     if show_tile is not None:
         if show_tile is True:
@@ -756,7 +756,7 @@ def _update_ldap_group_permission(
                     m18n.n("show_tile_cant_be_enabled_for_regex", permission=permission)
                 )
                 show_tile = False
-        update["showTile"] = [str(show_tile).upper()]
+        update["showTile"] = str(show_tile).upper()
 
     try:
         ldap.update(f"cn={permission},ou=permission", update)

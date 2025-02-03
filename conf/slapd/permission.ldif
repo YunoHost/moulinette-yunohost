@@ -16,9 +16,11 @@ olcAttributeTypes: ( 1.3.6.1.4.1.17953.9.1.3 NAME 'inheritPermission'
   SUP distinguishedName )
 olcAttributeTypes: ( 1.3.6.1.4.1.17953.9.1.4 NAME 'URL'
   DESC 'YunoHost permission main URL'
+  EQUALITY caseExactMatch
   SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{128} SINGLE-VALUE )
 olcAttributeTypes: ( 1.3.6.1.4.1.17953.9.1.5 NAME 'additionalUrls'
   DESC 'YunoHost permission additionnal URL'
+  EQUALITY caseExactMatch
   SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{128} )
 olcAttributeTypes: ( 1.3.6.1.4.1.17953.9.1.6 NAME 'authHeader'
   DESC 'YunoHost application, enable authentication header'

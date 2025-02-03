@@ -183,7 +183,7 @@ def portal_update(
     username, domain, current_user = _get_user_infos(
         ["givenName", "sn", "cn", "mail", "maildrop", "memberOf"]
     )
-    new_attr_dict = {}
+    new_attr_dict: dict[str, Any] = {}
 
     if fullname is not None and fullname != current_user["cn"]:
         fullname = fullname.strip()
@@ -191,11 +191,11 @@ def portal_update(
         lastname = (
             " ".join(fullname.split()[1:]) or " "
         )  # Stupid hack because LDAP requires the sn/lastname attr, but it accepts a single whitespace...
-        new_attr_dict["givenName"] = [firstname]  # TODO: Validate
-        new_attr_dict["sn"] = [lastname]  # TODO: Validate
-        new_attr_dict["cn"] = new_attr_dict["displayName"] = [
-            (firstname + " " + lastname).strip()
-        ]
+        new_attr_dict["givenName"] = firstname  # TODO: Validate
+        new_attr_dict["sn"] = lastname  # TODO: Validate
+        new_attr_dict["cn"] = new_attr_dict["displayName"] = (
+            firstname + " " + lastname
+        ).strip()
 
     if mailalias is not None:
         mailalias = [mail.strip() for mail in mailalias if mail and mail.strip()]
@@ -248,7 +248,7 @@ def portal_update(
         except YunohostValidationError as e:
             raise YunohostValidationError(e.key, path="newpassword")
 
-        new_attr_dict["userPassword"] = [_hash_user_password(newpassword)]
+        new_attr_dict["userPassword"] = _hash_user_password(newpassword)
 
     # Check that current password is valid
     # To be able to edit the user info, an authenticated ldap session is needed
@@ -278,7 +278,7 @@ def portal_update(
     # be run as root
     if all(field is not None for field in (fullname, mailalias, mailforward)):
         return {
-            "fullname": new_attr_dict["cn"][0],
+            "fullname": new_attr_dict["cn"],
             "mailalias": new_attr_dict["mail"][1:],
             "mailforward": new_attr_dict["maildrop"][1:],
         }

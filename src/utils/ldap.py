@@ -77,6 +77,53 @@ ROOTDN = "gidNumber=0+uidNumber=0,cn=peercred,cn=external,cn=auth"
 USERDN = "uid={username},ou=users,dc=yunohost,dc=org"
 
 
+def modifyModlist_finegrained(old_entry: dict, new_entry: dict) -> list:
+    """
+    Prepare an optimized modification list to give to ldap.modify_ext()
+    """
+    ldif = []
+    for attribute, value in new_entry.items():
+        if not isinstance(value, (set, list)):
+            value = {value}
+        old_value = old_entry.get(attribute, set())
+        if not isinstance(old_value, (set, list)):
+            old_value = {old_value}
+        if value == set(old_value):
+            continue
+
+        if not old_value:
+            ldif.append((ldap.MOD_ADD, attribute, list(value)))
+        elif not value:
+            ldif.append((ldap.MOD_DELETE, attribute, list(old_value)))
+        # Add or/and delete only needed values with unordered set
+        elif isinstance(value, set):
+            values_to_del = set(old_value) - value
+            if values_to_del == set(old_value):
+                ldif.append((ldap.MOD_REPLACE, attribute, list(value)))
+                continue
+            elif values_to_del:
+                ldif.append((ldap.MOD_DELETE, attribute, list(values_to_del)))
+
+            values_to_add = value - set(old_value)
+            if values_to_add:
+                ldif.append((ldap.MOD_ADD, attribute, list(values_to_add)))
+
+        # Add or/and delete only needed values with ordered list
+        else:
+            for i, v in enumerate(value):
+                if i >= len(old_value) or old_value[i] != v:
+                    break
+            if i == 0:
+                ldif.append((ldap.MOD_REPLACE, attribute, value))
+            else:
+                if old_value[i:]:
+                    ldif.append((ldap.MOD_DELETE, attribute, old_value[i:]))
+                if value[i:]:
+                    ldif.append((ldap.MOD_ADD, attribute, value[i:]))
+
+    return ldif
+
+
 class LDAPInterface:
 
     def __init__(self, user=None, password=None):
@@ -260,10 +307,18 @@ class LDAPInterface:
 
         """
         dn = f"{rdn},{BASEDN}"
-        actual_entry = self.search(rdn, attrs=None)
-        ldif = modlist.modifyModlist(actual_entry[0], attr_dict, ignore_oldexistent=1)
+        current_entry = self.search(rdn, attrs=None)
 
-        if ldif == []:
+        # Previously, we used modifyModlist, which directly uses the lib system libldap
+        # supplied with openldap. Unfortunately, the output of this command was not
+        # optimal with attributes containing lists (complete deletion then complete
+        # rewriting of the list). In view of the major performance problems associated
+        # with our inherited permissions system, we decided to rewrite this part to
+        # optimize the output.
+        # ldif = modlist.modifyModlist(current_entry[0], attr_dict, ignore_oldexistent=1)
+        ldif = modifyModlist_finegrained(current_entry[0], attr_dict)
+
+        if not ldif:
             logger.debug("Nothing to update in LDAP")
             return True
 
@@ -273,19 +328,23 @@ class LDAPInterface:
                 new_base = dn.split(",", 1)[1]
                 dn = new_rdn + "," + new_base
 
-            for i, (a, k, vs) in enumerate(ldif):
-                if isinstance(vs, list):
-                    vs = [v.encode("utf-8") for v in vs]
-                elif isinstance(vs, str):
-                    vs = [vs.encode("utf-8")]
-                ldif[i] = (a, k, vs)
+            # mod_op : 0 ADD, 1 DELETE, 2 REPLACE
+            for i, (mod_op, attribute, values) in enumerate(ldif):
+                if isinstance(values, list):
+                    values = [v.encode("utf-8") for v in values]
+                elif isinstance(values, str):
+                    values = [values.encode("utf-8")]
+                ldif[i] = (mod_op, attribute, values)
 
             self.con.modify_ext_s(dn, ldif)
         except Exception as e:
             raise MoulinetteError(
-                "error during LDAP update operation with: rdn='%s', "
-                "attr_dict=%s, new_rdn=%s and exception: %s"
-                % (rdn, attr_dict, new_rdn, e),
+                "Error during LDAP update operation:\n"
+                f" rdn: {rdn}\n"
+                f" attr_dict: {attr_dict}\n"
+                f" new_rdn: {new_rdn}\n"
+                f" ldif: {ldif}\n"
+                f" exception: {e}",
                 raw_msg=True,
             )
         else:

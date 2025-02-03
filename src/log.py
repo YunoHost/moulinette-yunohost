@@ -262,7 +262,7 @@ def log_list(
     return {"operation": operations}
 
 
-log_list.cache = {}
+log_list.cache = {}  # type: ignore
 
 
 def log_show(
