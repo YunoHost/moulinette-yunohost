@@ -233,7 +233,7 @@
     "log_remove_on_failed_install": "Enlever '{}' après une installation échouée",
     "log_domain_add": "Ajouter le domaine '{}'",
     "log_domain_remove": "Supprimer le domaine '{}'",
-    "log_dyndns_subscribe": "Souscrire au sous-domaine YunoHost '{}'",
+    "log_dyndns_subscribe": "Enregistrer un sous-domaine YunoHost '{}'",
     "log_dyndns_update": "Mettre à jour l'adresse IP associée à votre sous-domaine YunoHost '{}'",
     "log_letsencrypt_cert_install": "Installer le certificat Let's Encrypt sur le domaine '{}'",
     "log_selfsigned_cert_install": "Installer un certificat auto-signé sur le domaine '{}'",
@@ -726,7 +726,7 @@
     "dyndns_set_recovery_password_invalid_password": "Échec de la mise en place du mot de passe de récupération : le mot de passe n'est pas assez fort/solide",
     "dyndns_set_recovery_password_failed": "Échec de la mise en place du mot de passe de récupération : {error}",
     "dyndns_set_recovery_password_success": "Mot de passe de récupération changé !",
-    "log_dyndns_unsubscribe": "Se désabonner d'un sous-domaine YunoHost '{}'",
+    "log_dyndns_unsubscribe": "Supprimer un sous-domaine YunoHost '{}'",
     "dyndns_too_many_requests": "Le service dyndns de YunoHost a reçu trop de requêtes/demandes de votre part, attendez environ 1 heure avant de réessayer.",
     "ask_dyndns_recovery_password_explain_unavailable": "Ce domaine DynDNS est déjà enregistré. Si vous êtes la personne qui a enregistré ce domaine lors de sa création, vous pouvez entrer le mot de passe de récupération pour récupérer ce domaine.",
     "global_settings_setting_ssh_port_help": "Il est préférable d'utiliser un port inférieur à 1024 pour éviter les tentatives d'usurpation par des services non administrateurs sur la machine distante. Vous devez également éviter d'utiliser un port déjà utilisé tel que le 80 ou le 443.",
@@ -840,10 +840,10 @@
     "pydantic_value_error_url_port": "Port URL non valide, le port ne peut pas dépasser 65535",
     "pydantic_value_error_url_scheme": "Schéma d'URL non invalide ou manquant",
     "unable_authenticate": "Échec de l'authentification de la session",
-    "group_cannot_remove_last_admin": "L'utilisateur '{user}' est le dernier utilisateur du groupe 'admins' et ne sera pas supprimé de celui-ci.",
-    "user_cannot_delete_last_admin": "L'utilisateur '{user}' est le dernier utilisateur du groupe 'admins' et il ne sera donc pas supprimé.",
+    "group_cannot_remove_last_admin": "Le compte '{user}' est le dernier seul dans le groupe 'admins' aussi il ne sera pas supprimé de celui-ci.",
+    "user_cannot_delete_last_admin": "L'utilisateur '{user}' est le dernier utilisateur du groupe 'admins' aussi il ne sera donc pas supprimé.",
     "log_diagnosis_run": "Exécuter le diagnostic",
-    "log_tools_update": "Recherche des mises à jour système en cours et actualisation du catalogue d'applications",
+    "log_tools_update": "Recherche des mises à jour système et du catalogue d'applications en cours",
     "migration_description_0032_firewall_config": "Migration du fichier de configuration du pare-feu interne",
-    "user_import_cannot_edit_or_delete_admins": "Impossible de modifier ou de supprimer '{user}' car l'utilisateur est administrateur"
+    "user_import_cannot_edit_or_delete_admins": "Impossible de modifier ou de supprimer '{user}' car ce compte est administrateur"
 }
