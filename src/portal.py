@@ -77,14 +77,21 @@ def _get_portal_settings(
         "portal_title": "YunoHost",
         "show_other_domains_apps": False,
         "domain": domain,
+        "allow_edit_email": False,
+        "allow_edit_email_alias": False,
+        "allow_edit_email_forward": False,
     }
 
     portal_settings_path = Path(f"{PORTAL_SETTINGS_DIR}/{domain}.json")
+    global_portal_settings_path = Path(f"{PORTAL_SETTINGS_DIR}/global_settings.json")
 
     if portal_settings_path.exists():
         settings.update(read_json(str(portal_settings_path)))
         # Portal may be public (no login required)
         settings["public"] = bool(settings.pop("enable_public_apps_page", False))
+
+    if global_portal_settings_path.exists():
+        settings.update(read_json(str(global_portal_settings_path)))
 
     # First clear apps since it may contains private apps
     apps: dict[str, Any] = settings.pop("apps", {})
@@ -172,6 +179,7 @@ def portal_me():
 
 def portal_update(
     fullname: Union[str, None] = None,
+    mainemail: Union[str, None] = None,
     mailforward: Union[list[str], None] = None,
     mailalias: Union[list[str], None] = None,
     currentpassword: Union[str, None] = None,
@@ -184,6 +192,7 @@ def portal_update(
         ["givenName", "sn", "cn", "mail", "maildrop", "memberOf"]
     )
     new_attr_dict = {}
+    portal_settings = _get_portal_settings(domain, username)
 
     if fullname is not None and fullname != current_user["cn"]:
         fullname = fullname.strip()
@@ -197,14 +206,47 @@ def portal_update(
             (firstname + " " + lastname).strip()
         ]
 
+    new_mails = current_user["mail"]
+
+    if mainemail is not None:
+        is_allowed_to_edit_main_email = portal_settings["allow_edit_email"]
+        if is_allowed_to_edit_main_email != 1:
+            raise YunohostValidationError("mail_edit_operation_unauthorized")
+
+        if mainemail not in new_mails:
+            local_part, domain = mainemail.split("@")
+            if local_part in ADMIN_ALIASES:
+                raise YunohostValidationError("mail_unavailable")
+
+            try:
+                _get_ldap_interface().validate_uniqueness({"mail": mainemail})
+            except YunohostError:
+                raise YunohostValidationError(
+                    "mail_already_exists", mail=mainemail
+                )
+
+            if domain not in domains or not user_is_allowed_on_domain(username, domain):
+                raise YunohostValidationError("mail_alias_unauthorized", domain=domain)
+            new_mails[0] = mainemail
+        else:
+            # email already exist in the list we just move it on the first place
+            new_mails.remove(mainemail)
+            new_mails = [mainemail] + new_mails[1:]
+
+        new_attr_dict["mail"] = new_mails
+
     if mailalias is not None:
+        is_allowed_to_edit_mail_alias = portal_settings["allow_edit_email_alias"]
+        if is_allowed_to_edit_mail_alias != 1:
+            raise YunohostValidationError("mail_edit_operation_unauthorized")
+
         mailalias = [mail.strip() for mail in mailalias if mail and mail.strip()]
         # keep first current mail unaltered
-        mails = [current_user["mail"][0]]
+        mails = [new_mails[0]]
 
         for index, mail in enumerate(mailalias):
-            if mail in current_user["mail"]:
-                if mail != current_user["mail"][0] and mail not in mails:
+            if mail in new_mails:
+                if mail != new_mails[0] and mail not in mails:
                     mails.append(mail)
                 continue  # already in mails, skip validation
 
@@ -229,6 +271,10 @@ def portal_update(
         new_attr_dict["mail"] = mails
 
     if mailforward is not None:
+        is_allowed_to_edit_mail_forward = portal_settings["allow_edit_email_forward"]
+        if is_allowed_to_edit_mail_forward != 1:
+            raise YunohostValidationError("mail_edit_operation_unauthorized")
+
         new_attr_dict["maildrop"] = [current_user["maildrop"][0]] + [
             mail.strip()
             for mail in mailforward
