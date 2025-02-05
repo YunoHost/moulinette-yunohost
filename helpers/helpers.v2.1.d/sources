@@ -265,7 +265,5 @@ ynh_setup_source() {
     fi
     rm -rf /var/cache/yunohost/files_to_keep_during_setup_source/
 
-    if [ -n "${install_dir:-}" ] && [ "$dest_dir" == "$install_dir" ]; then
-        _ynh_apply_default_permissions $dest_dir
-    fi
+    _ynh_apply_default_permissions $dest_dir
 }
