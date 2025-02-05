@@ -25,7 +25,7 @@ _ynh_app_config_get_one() {
     local getter="get__${short_setting}"
     # Get value from getter if exists
     if type -t $getter 2> /dev/null | grep -q '^function$' 2> /dev/null; then
-        old[$short_setting]="$($getter)"
+        old[$short_setting]="\"$($getter)\""
         formats[${short_setting}]="yaml"
 
     elif [[ "$bind" == *"("* ]] && type -t "get__${bind%%(*}" 2> /dev/null | grep -q '^function$' 2> /dev/null; then
