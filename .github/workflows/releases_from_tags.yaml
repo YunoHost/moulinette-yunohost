@@ -1,0 +1,33 @@
+name: Automatically write releases when tags appear
+
+on:
+  push:
+    tags: [ "debian/*" ]
+
+
+jobs:
+  pre-release:
+    name: Generate releases
+    runs-on: ubuntu-latest
+    permissions:
+      # Give the default GITHUB_TOKEN write permission to commit and push the changed files back to the repository.
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@master
+        with:
+          fetch-depth: 0 # Fetch all tags
+
+      - name: Patch tag name
+        id: patch-tag-name
+        run: echo "version=$(echo ${{ github.ref }} | sed 's|refs/tags/debian/||')" >> $GITHUB_OUTPUT
+
+      - name: Create Release for Tag
+        id: release_tag
+        uses: Akryum/release-tag@v4.0.7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          release_name: YunoHost ${{ steps.patch-tag-name.outputs.version }}
+          tag_name: ${{ github.ref }}
