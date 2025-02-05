@@ -121,3 +121,124 @@ ynh_require_ram() {
         return 0
     fi
 }
+
+
+# Ask the creation of a swap file for the application.
+# The helper might or might not create the swap file, considering the machine's configuration.
+#
+# [packagingv1]
+#
+# usage: ynh_add_swap --size=SWAP in Mib
+# | arg: -s, --size= - Amount of SWAP to add in Mib.
+ynh_add_swap () {
+    # Declare an array to define the options of this helper.
+    local -A args_array=( [s]=size= )
+    local size
+    # Manage arguments with getopts
+    ynh_handle_getopts_args "$@"
+
+    # Could be moved to an argument
+    swapfile_dir="$(realpath /)"
+    swapfile_path="$(realpath "$swapfile_dir/swap_yunohost")"
+
+    # Early warning exit: Can't swap inside LXD
+    if [[ "$(systemd-detect-virt)" == "lxc" ]]; then
+        ynh_print_warn --message="You are inside a LXC container, swap will not be added."
+        ynh_print_warn --message="That can cause troubles for $app. Please make sure you have more than $((size/1024))G of RAM/swap available."
+        return
+    fi
+
+    # Early warning exit: Preserve SD cards and do not swap on them
+    if ynh_is_on_sd_card --dir="$swapfile_dir" && [[ "${SD_CARD_CAN_SWAP:-0}" == "0" ]]; then
+        ynh_print_warn --message="Swap files on an SD card is not recommended, swap will not be added."
+        ynh_print_warn --message="That can cause troubles for $app. Please make sure you have more than $((size/1024))G of RAM/swap available."
+        ynh_print_warn --message="If you still want activate the swap, you can relaunch the command preceded by 'SD_CARD_CAN_SWAP=1'"
+        return
+    fi
+
+    # Early warning exit: swapfile already exists
+    if [ -f "$swapfile_path" ]; then
+        ynh_print_warn --message="Swap file $swapfile_path already exists!"
+        return
+    fi
+
+
+    local free_space_kb
+    free_space_kb=$(df --block-size=K --output=avail "$swapfile_dir" | sed 1d | sed -e 's/K$//')
+    # We don't want to fill the disk with a swap file.
+    local usable_space=$(( free_space_kb / 1024 - 1024 ))
+
+    # Compare the available space with the size of the swap.
+    if (( size > usable_space )); then
+        ynh_print_warn --message="Not enough space for a swap file at $swapfile_path."
+        return
+    fi
+    swap_size_kb=$(( size * 1024 ))
+
+    # Configure swappiness
+    if [ ! -f /etc/sysctl.d/999-yunohost-swap.conf ]; then
+        echo "vm.swappiness=10" > /etc/sysctl.d/999-ynhswap.conf
+        sysctl --quiet --system
+    fi
+
+    # Workaround for some copy-on-write filesystems like btrfs.
+    # Create the file
+    truncate -s 0 "$swapfile_path"
+    # Set the No_COW attribute on the swapfile with chattr
+    chattr +C "$swapfile_path" || true
+    # Set the final file size
+    dd if=/dev/zero of="$swapfile_path" bs=1024 count="$swap_size_kb"
+    chmod 0600 "$swapfile_path"
+
+    # Create the swap
+    mkswap "$swapfile_path"
+    # And activate it
+    swapon "$swapfile_path"
+    # Then add an entry in fstab to load this swap at each boot.
+    echo -e "$swapfile_path swap swap defaults 0 0 #Swap added by $app" >> /etc/fstab
+}
+
+# Delete the swap file created for the app by ynh_add_swap.
+#
+# [packagingv1]
+#
+ynh_del_swap () {
+    # Could be moved to an argument
+    swapfile_dir="$(realpath /)"
+    swapfile_path="$(realpath "$swapfile_dir/swap_yunohost")"
+
+    if [ ! -f "$swapfile_path" ]; then
+        return
+    fi
+
+    # Clean the fstab...
+    sed -i "/#Swap added by $app/d" /etc/fstab
+    # Desactive the swap file...
+    swapoff "$swapfile_path"
+    # And remove it.
+    rm "$swapfile_path"
+}
+
+# Check if the device of the provided directory is an SD card
+#
+# [internal]
+#
+# usage: ynh_is_on_sd_card --dir=/
+# | arg: -d, --dir= - Directory to check
+ynh_is_on_sd_card () {
+    # Declare an array to define the options of this helper.
+    local -A args_array=( [d]=dir= )
+    local dir
+    # Manage arguments with getopts
+    ynh_handle_getopts_args "$@"
+
+    device_dev=$(findmnt --nofsroot --uniq --output source --noheadings --first-only --target "$dir")
+    device_pkname=$(lsblk --output PKNAME --noheadings "$device_dev")
+    device_rotational=$(lsblk --output ROTA --noheadings "$device_dev")
+
+    if [[ "$device_pkname" == *"mmc"* ]] && [[ "$device_rotational" == "0" ]]; then
+        return 0
+    else
+        return 1
+    fi
+}

@@ -1,0 +1,31 @@
+#!/bin/bash
+
+source /usr/share/yunohost/helpers
+
+do_pre_regen() {
+	:
+}
+
+do_post_regen() {
+    swapfile_enabled="$(yunohost settings get 'swap.swapfile.swapfile_enabled')"
+    swapfile_size="$(yunohost settings get 'swap.swapfile.swapfile_size')"
+
+    if [ ${swapfile_enabled} -eq 1 ]; then
+        # If a swapfile is requested
+        if [ -f /swap_file ] && [ $(stat -c%s /swap_file) -ne $swapfile_size ]; then
+            # Let's delete it first if it is not of the requested size
+            ynh_print_info --message="Deleting swap first..."
+            ynh_del_swap
+        fi
+        # create the swapfile
+        ynh_print_info --message="Attempting to create $swapfile_size MB swap..."
+        ynh_add_swap --size=$swapfile_size
+        ynh_print_info --message="A $((swap_size / 1024)) MB swap has been created."
+    else
+        # If not, make sure it is deleted
+        ynh_print_info --message="Deleting swap..."
+        ynh_del_swap
+    fi
+}
+
+do_$1_regen ${@:2}
