@@ -344,6 +344,11 @@
     
     [inwx.auth_password]
     type = "password"
+
+[ionos]
+    [ionos.api_key]
+    type = "string"
+    redact = true
     
 [joker]
     [joker.auth_token]
