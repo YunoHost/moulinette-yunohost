@@ -27,7 +27,7 @@ i18n = "domain_config"
 
         [feature.portal.show_other_domains_apps]
         type = "boolean"
-        default = false
+        default = true
 
         [feature.portal.portal_title]
         type = "string"
