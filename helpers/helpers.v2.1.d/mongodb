@@ -230,6 +230,7 @@ ynh_mongo_remove_db() {
 }
 
 # Install MongoDB and integrate MongoDB service in YunoHost
+# It can upgrade / downgrade the desired mongo version to ensure a compatible one is installed
 #
 # The installed version is defined by $mongo_version which should be defined as global prior to calling this helper
 #
@@ -251,10 +252,41 @@ ynh_install_mongo() {
         mongo_debian_release=buster
     fi
 
-    ynh_apt_install_dependencies_from_extra_repository \
-        --repo="deb http://repo.mongodb.org/apt/debian $mongo_debian_release/mongodb-org/$mongo_version main" \
-        --package="mongodb-org mongodb-org-server mongodb-org-tools mongodb-mongosh" \
-        --key="https://www.mongodb.org/static/pgp/server-$mongo_version.asc"
+    if [[ "$mongo_debian_release" == "bookworm" && "$mongo_version" != "7."* ]]; then
+        ynh_print_warn --message="Switched to Mongo v7 as $mongo_version is not compatible with $mongo_debian_release"
+        mongo_version = "7.0"
+    fi
+
+    # Check if MongoDB is already installed
+    local install_package=true
+    local current_version=$(ynh_package_version --package="mongodb-org-server")
+    # Focus only the major, minor versions
+    current_version=$(cut -c 1-3 <<< "$current_version")
+
+    if [[ "a$current_version" != "a" ]]; then
+        if (($(bc <<< "$current_version < $mongo_version"))); then
+            if (($(bc <<< "scale = 0 ; x = $mongo_version / 1 - $current_version / 1; x > 1.0"))); then
+                # Mongo only support upgrading a major version to another
+                ynh_die "Upgrading Mongo from version  $current_version to $mongo_version is not supported"
+                install_package=false
+            else
+                ynh_print_info --message="Upgrading Mongo from version $current_version to $mongo_version"
+            fi
+        else
+            if (($(bc <<< "$current_version >= $mongo_version"))); then
+                ynh_print_warn --message="Mongo version $current_version is already installed and will be kept instead of requested version $mongo_version"
+                install_package=false
+            fi
+        fi
+    fi
+
+    if [[ "$install_package" = true ]]; then
+        ynh_apt_install_dependencies_from_extra_repository \
+            --repo="deb http://repo.mongodb.org/apt/debian $mongo_debian_release/mongodb-org/$mongo_version main" \
+            --package="mongodb-org mongodb-org-server mongodb-org-tools mongodb-mongosh" \
+            --key="https://www.mongodb.org/static/pgp/server-$mongo_version.asc"
+    fi
+
     mongodb_servicename=mongod
 
     # Make sure MongoDB is started and enabled
@@ -278,7 +310,7 @@ ynh_install_mongo() {
 #
 ynh_remove_mongo() {
     # Only remove the mongodb service if it is not installed.
-    if ! _ynh_apt_package_is_installed "mongodb*"; then
+    if ! _ynh_apt_package_is_installed "mongodb-org"; then
         ynh_print_info "Removing MongoDB service..."
         mongodb_servicename=mongod
         # Remove the mongodb service
