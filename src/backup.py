@@ -39,9 +39,7 @@ from moulinette.utils.filesystem import (
     chown,
     mkdir,
     read_file,
-    read_yaml,
     rm,
-    write_to_yaml,
 )
 from moulinette.utils.process import check_output
 from moulinette.utils.text import random_ascii
@@ -704,7 +702,6 @@ class BackupManager:
         Args:
         app -- (string) an app instance name (already installed) to backup
         """
-        from yunohost.permission import user_permission_list
 
         app_setting_path = os.path.join("/etc/yunohost/apps/", app)
 
@@ -733,12 +730,6 @@ class BackupManager:
             )[0]
 
             self._import_to_list_to_backup(env_dict["YNH_BACKUP_CSV"])
-
-            # backup permissions
-            logger.debug(m18n.n("backup_permission", app=app))
-            permissions = user_permission_list(full=True, apps=[app])["permissions"]
-            this_app_permissions = {name: infos for name, infos in permissions.items()}
-            write_to_yaml(f"{settings_dir}/permissions.yml", this_app_permissions)
 
         except Exception as e:
             logger.debug(e)
@@ -968,9 +959,11 @@ class RestoreManager:
         End a restore operations by cleaning the working directory and
         regenerate ssowat conf (if some apps were restored)
         """
-        from .permission import permission_sync_to_user
+        from yunohost.app import app_ssowatconf
+        from yunohost.permission import _sync_permissions_with_ldap
 
-        permission_sync_to_user()
+        _sync_permissions_with_ldap()
+        app_ssowatconf()
 
         if os.path.ismount(self.work_dir):
             ret = subprocess.call(["umount", self.work_dir])
@@ -1221,18 +1214,8 @@ class RestoreManager:
         if system_targets == []:
             return
 
-        from yunohost.permission import (
-            permission_create,
-            permission_delete,
-            permission_sync_to_user,
-            user_permission_list,
-        )
-
-        # Backup old permission for apps
-        # We need to do that because in case of an app is installed we can't remove the permission for this app
-        old_apps_permission = user_permission_list(ignore_system_perms=True, full=True)[
-            "permissions"
-        ]
+        from yunohost.app import app_ssowatconf
+        from yunohost.permission import _sync_permissions_with_ldap
 
         # Start register change on system
         operation_logger = OperationLogger("backup_restore_system")
@@ -1289,33 +1272,8 @@ class RestoreManager:
             backup_version=self.info["from_yunohost_version"]
         )
 
-        # Remove all permission for all app still in the LDAP
-        for permission_name in user_permission_list(ignore_system_perms=True)[
-            "permissions"
-        ].keys():
-            permission_delete(permission_name, force=True, sync_perm=False)
-
-        # Restore permission for apps installed
-        for permission_name, permission_infos in old_apps_permission.items():
-            app_name, perm_name = permission_name.split(".")
-            if _is_installed(app_name):
-                permission_create(
-                    permission_name,
-                    allowed=permission_infos["allowed"],
-                    url=permission_infos["url"],
-                    additional_urls=permission_infos["additional_urls"],
-                    auth_header=permission_infos["auth_header"],
-                    label=(
-                        permission_infos["label"]
-                        if perm_name == "main"
-                        else permission_infos["sublabel"]
-                    ),
-                    show_tile=permission_infos["show_tile"],
-                    protected=permission_infos["protected"],
-                    sync_perm=False,
-                )
-
-        permission_sync_to_user()
+        _sync_permissions_with_ldap()
+        app_ssowatconf()
 
     def _restore_apps(self):
         """Restore all apps targeted"""
@@ -1347,8 +1305,6 @@ class RestoreManager:
         app_instance_name -- (string) The app name to restore (no app with this
                              name should be already install)
         """
-        from yunohost.permission import permission_create, permission_sync_to_user
-        from yunohost.user import user_group_list
         from yunohost.utils.legacy import _patch_legacy_helpers
 
         def copytree(src, dst, symlinks=False, ignore=None):
@@ -1408,47 +1364,6 @@ class RestoreManager:
             chmod(tmp_workdir_for_app, 0o700, 0o700, True)
             chown(tmp_workdir_for_app, "root", None, True)
             restore_script = os.path.join(tmp_workdir_for_app, "restore")
-
-            # Restore permissions
-            if not os.path.isfile(f"{app_settings_new_path}/permissions.yml"):
-                raise YunohostError(
-                    "Didnt find a permssions.yml for the app !?", raw_msg=True
-                )
-
-            permissions = read_yaml(f"{app_settings_new_path}/permissions.yml")
-            existing_groups = user_group_list()["groups"]
-
-            for permission_name, permission_infos in permissions.items():
-                if "allowed" not in permission_infos:
-                    logger.warning(
-                        f"'allowed' key corresponding to allowed groups for permission {permission_name} not found when restoring app {app_instance_name} … You might have to reconfigure permissions yourself."
-                    )
-                    should_be_allowed = ["all_users"]
-                else:
-                    should_be_allowed = [
-                        g for g in permission_infos["allowed"] if g in existing_groups
-                    ]
-
-                perm_name = permission_name.split(".")[1]
-                permission_create(
-                    permission_name,
-                    allowed=should_be_allowed,
-                    url=permission_infos.get("url"),
-                    additional_urls=permission_infos.get("additional_urls"),
-                    auth_header=permission_infos.get("auth_header"),
-                    label=(
-                        permission_infos.get("label")
-                        if perm_name == "main"
-                        else permission_infos.get("sublabel")
-                    ),
-                    show_tile=permission_infos.get("show_tile", True),
-                    protected=permission_infos.get("protected", False),
-                    sync_perm=False,
-                )
-
-            permission_sync_to_user()
-
-            os.remove(f"{app_settings_new_path}/permissions.yml")
 
             _tools_migrations_run_before_app_restore(
                 backup_version=self.info["from_yunohost_version"],

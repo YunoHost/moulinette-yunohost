@@ -9,28 +9,28 @@ olcAttributeTypes: ( 1.3.6.1.4.1.17953.9.1.1 NAME 'permission'
   DESC 'YunoHost permission on user and group side'
   SUP distinguishedName )
 olcAttributeTypes: ( 1.3.6.1.4.1.17953.9.1.2 NAME 'groupPermission'
-  DESC 'YunoHost permission for a group on permission side'
+  DESC 'YunoHost permission for a group on permission side' OBSOLETE
   SUP distinguishedName )
 olcAttributeTypes: ( 1.3.6.1.4.1.17953.9.1.3 NAME 'inheritPermission'
   DESC 'YunoHost permission for user on permission side'
   SUP distinguishedName )
 olcAttributeTypes: ( 1.3.6.1.4.1.17953.9.1.4 NAME 'URL'
-  DESC 'YunoHost permission main URL'
+  DESC 'YunoHost permission main URL' OBSOLETE
   SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{128} SINGLE-VALUE )
 olcAttributeTypes: ( 1.3.6.1.4.1.17953.9.1.5 NAME 'additionalUrls'
-  DESC 'YunoHost permission additionnal URL'
+  DESC 'YunoHost permission additionnal URL' OBSOLETE
   SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{128} )
 olcAttributeTypes: ( 1.3.6.1.4.1.17953.9.1.6 NAME 'authHeader'
-  DESC 'YunoHost application, enable authentication header'
+  DESC 'YunoHost application, enable authentication header' OBSOLETE
   SYNTAX 1.3.6.1.4.1.1466.115.121.1.7 SINGLE-VALUE )
 olcAttributeTypes: ( 1.3.6.1.4.1.17953.9.1.7 NAME 'label'
-  DESC 'YunoHost permission label, also used for the tile name in the SSO'
+  DESC 'YunoHost permission label, also used for the tile name in the SSO' OBSOLETE
   SYNTAX 1.3.6.1.4.1.1466.115.121.1.15{128} SINGLE-VALUE )
 olcAttributeTypes: ( 1.3.6.1.4.1.17953.9.1.8 NAME 'showTile'
-  DESC 'YunoHost application, show/hide the tile in the SSO for this permission'
+  DESC 'YunoHost application, show/hide the tile in the SSO for this permission' OBSOLETE
   SYNTAX 1.3.6.1.4.1.1466.115.121.1.7 SINGLE-VALUE )
 olcAttributeTypes: ( 1.3.6.1.4.1.17953.9.1.9 NAME 'isProtected'
-  DESC 'YunoHost application permission protection'
+  DESC 'YunoHost application permission protection' OBSOLETE
   SYNTAX 1.3.6.1.4.1.1466.115.121.1.7 SINGLE-VALUE )
 # OBJECTCLASS
 # For Applications
@@ -39,12 +39,12 @@ olcObjectClasses: ( 1.3.6.1.4.1.17953.9.2.1 NAME 'groupOfNamesYnh'
   SUP top AUXILIARY
   MAY ( member $ businessCategory $ seeAlso $ owner $ ou $ o $ permission ) )
 olcObjectClasses: ( 1.3.6.1.4.1.17953.9.2.2 NAME 'permissionYnh'
-  DESC 'a YunoHost application'
+  DESC 'a YunoHost permission'
   SUP top AUXILIARY
-  MUST ( cn $ authHeader $ label $ showTile $ isProtected )
-  MAY ( groupPermission $ inheritPermission $ URL $ additionalUrls ) )
+  MUST ( cn )
+  MAY ( groupPermission $ inheritPermission $ URL $ additionalUrls $ authHeader $ label $ showTile $ isProtected ) )
 # For User
 olcObjectClasses: ( 1.3.6.1.4.1.17953.9.2.3 NAME 'userPermissionYnh'
-  DESC 'a YunoHost application'
+  DESC 'a YunoHost user with permission attributes'
   SUP top AUXILIARY
   MAY ( permission ) )

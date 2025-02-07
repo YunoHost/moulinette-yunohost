@@ -90,7 +90,7 @@ def clean():
     os.system("systemctl start nginx")
 
     # Clean permissions
-    for permission_name in user_permission_list(short=True)["permissions"]:
+    for permission_name in user_permission_list()["permissions"]:
         if any(test_app in permission_name for test_app in test_apps):
             permission_delete(permission_name, force=True)
 

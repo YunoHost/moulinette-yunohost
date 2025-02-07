@@ -149,6 +149,7 @@ def regen_conf(
     # so that scripts dont have to call 'yunohost settings get' manually
     # which is painful performance-wise
     env["YNH_SETTINGS"] = json.dumps(settings_get("", export=True))
+    env["FORCE"] = "true" if force else "false"
 
     pre_result = hook_callback("conf_regen", names, pre_callback=_pre_call, env=env)
 

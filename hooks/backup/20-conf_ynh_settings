@@ -29,6 +29,7 @@ backup_dir="${1}/conf/ynh"
 
 # Backup the configuration
 ynh_backup "/etc/yunohost/firewall.yml" "${backup_dir}/firewall.yml"
+ynh_backup "/etc/yunohost/permissions.yml" "${backup_dir}/permissions.yml"
 ynh_backup "/etc/yunohost/current_host" "${backup_dir}/current_host"
 [ ! -d "/etc/yunohost/portal" ] || ynh_backup "/etc/yunohost/portal" "${backup_dir}/portal"
 [ ! -d "/etc/yunohost/domains" ] || ynh_backup "/etc/yunohost/domains" "${backup_dir}/domains"

@@ -41,12 +41,13 @@ class MyMigration(Migration):
 
     @Migration.ldap_migration
     def run(self, *args):
-        from yunohost.permission import permission_delete, user_permission_list
+        #from yunohost.permission import permission_delete, user_permission_list
 
         self.ldap_migration_started = True
 
-        if "xmpp.main" in user_permission_list()["permissions"]:
-            permission_delete("xmpp.main", force=True)
+        # FIXME : xmpp will be implicitly deleted after perm refactor ?
+        #if "xmpp.main" in user_permission_list()["permissions"]:
+        #    permission_delete("xmpp.main", force=True)
 
     def run_after_system_restore(self):
         self.run()

@@ -21,7 +21,7 @@
 # Create a new permission for the app
 #
 # Example 1: `ynh_permission_create --permission=admin --url=/admin --additional_urls=domain.tld/admin /superadmin --allowed=alice bob \
-#                                  --label="My app admin" --show_tile=true`
+#                                  --show_tile=true`
 #
 # This example will create a new permission permission with this following effect:
 # - A tile named "My app admin" in the SSO will be available for the users alice and bob. This tile will point to the relative url '/admin'.
@@ -31,7 +31,7 @@
 # Example 2:
 #
 #     ynh_permission_create --permission=api --url=domain.tld/api --auth_header=false --allowed=visitors \
-#                                  --label="MyApp API" --protected=true
+#                                  --protected=true
 #
 # This example will create a new protected permission. So the admin won't be able to add/remove the visitors group of this permission.
 # In case of an API with need to be always public it avoid that the admin break anything.
@@ -43,14 +43,13 @@
 #
 #
 # usage: ynh_permission_create --permission="permission" [--url="url"] [--additional_urls="second-url" [ "third-url" ]] [--auth_header=true|false]
-#                                                        [--allowed=group1 [ group2 ]] [--label="label"] [--show_tile=true|false]
+#                                                        [--allowed=group1 [ group2 ]] [--show_tile=true|false]
 #                                                        [--protected=true|false]
 # | arg: -p, --permission=       - the name for the permission (by default a permission named "main" already exist)
 # | arg: -u, --url=              - (optional) URL for which access will be allowed/forbidden. Note that if 'show_tile' is enabled, this URL will be the URL of the tile.
 # | arg: -A, --additional_urls=  - (optional) List of additional URL for which access will be allowed/forbidden
 # | arg: -h, --auth_header=      - (optional) Define for the URL of this permission, if SSOwat pass the authentication header to the application. Default is true
 # | arg: -a, --allowed=          - (optional) A list of group/user to allow for the permission
-# | arg: -l, --label=            - (optional) Define a name for the permission. This label will be shown on the SSO and in the admin. Default is "APP_LABEL (permission name)".
 # | arg: -t, --show_tile=        - (optional) Define if a tile will be shown in the SSO. If yes the name of the tile will be the 'label' parameter. Defaults to false for the permission different than 'main'.
 # | arg: -P, --protected=        - (optional) Define if this permission is protected. If it is protected the administrator won't be able to add or remove the visitors group of this permission. Defaults to 'false'.
 #
@@ -84,13 +83,12 @@
 ynh_permission_create() {
     # Declare an array to define the options of this helper.
     local legacy_args=puAhaltP
-    local -A args_array=([p]=permission= [u]=url= [A]=additional_urls= [h]=auth_header= [a]=allowed= [l]=label= [t]=show_tile= [P]=protected=)
+    local -A args_array=([p]=permission= [u]=url= [A]=additional_urls= [h]=auth_header= [a]=allowed= [t]=show_tile= [P]=protected=)
     local permission
     local url
     local additional_urls
     local auth_header
     local allowed
-    local label
     local show_tile
     local protected
     ynh_handle_getopts_args "$@"
@@ -98,7 +96,6 @@ ynh_permission_create() {
     additional_urls=${additional_urls:-}
     auth_header=${auth_header:-}
     allowed=${allowed:-}
-    label=${label:-}
     show_tile=${show_tile:-}
     protected=${protected:-}
 
@@ -134,12 +131,6 @@ ynh_permission_create() {
         allowed=",allowed=['${allowed//;/\',\'}']"
     fi
 
-    if [[ -n ${label:-} ]]; then
-        label=",label='$label'"
-    else
-        label=",label='$permission'"
-    fi
-
     if [[ -n ${show_tile:-} ]]; then
         if [ $show_tile == "true" ]; then
             show_tile=",show_tile=True"
@@ -156,7 +147,7 @@ ynh_permission_create() {
         fi
     fi
 
-    yunohost tools shell -c "from yunohost.permission import permission_create; permission_create('$app.$permission' $url $additional_urls $auth_header $allowed $label $show_tile $protected)"
+    yunohost tools shell -c "from yunohost.permission import permission_create; permission_create('$app.$permission' $url $additional_urls $auth_header $allowed $show_tile $protected)"
 }
 
 # Remove a permission for the app (note that when the app is removed all permission is automatically removed)
@@ -266,11 +257,10 @@ ynh_permission_url() {
 # Update a permission for the app
 #
 # usage: ynh_permission_update --permission "permission" [--add="group" ["group" ...]] [--remove="group" ["group" ...]]
-#                                                        [--label="label"] [--show_tile=true|false] [--protected=true|false]
+#                                                        [--show_tile=true|false] [--protected=true|false]
 # | arg: -p, --permission= - the name for the permission (by default a permission named "main" already exist)
 # | arg: -a, --add=        - the list of group or users to enable add to the permission
 # | arg: -r, --remove=     - the list of group or users to remove from the permission
-# | arg: -l, --label=      - (optional) Define a name for the permission. This label will be shown on the SSO and in the admin.
 # | arg: -t, --show_tile=  - (optional) Define if a tile will be shown in the SSO
 # | arg: -P, --protected=  - (optional) Define if this permission is protected. If it is protected the administrator won't be able to add or remove the visitors group of this permission.
 #
@@ -278,17 +268,15 @@ ynh_permission_url() {
 ynh_permission_update() {
     # Declare an array to define the options of this helper.
     local legacy_args=parltP
-    local -A args_array=([p]=permission= [a]=add= [r]=remove= [l]=label= [t]=show_tile= [P]=protected=)
+    local -A args_array=([p]=permission= [a]=add= [r]=remove= [t]=show_tile= [P]=protected=)
     local permission
     local add
     local remove
-    local label
     local show_tile
     local protected
     ynh_handle_getopts_args "$@"
     add=${add:-}
     remove=${remove:-}
-    label=${label:-}
     show_tile=${show_tile:-}
     protected=${protected:-}
 
@@ -311,10 +299,6 @@ ynh_permission_update() {
         remove=",remove=['${remove//';'/"','"}']"
     fi
 
-    if [[ -n $label ]]; then
-        label=",label='$label'"
-    fi
-
     if [[ -n $show_tile ]]; then
         if [ $show_tile == "true" ]; then
             show_tile=",show_tile=True"
@@ -331,7 +315,7 @@ ynh_permission_update() {
         fi
     fi
 
-    yunohost tools shell -c "from yunohost.permission import user_permission_update; user_permission_update('$app.$permission' $add $remove $label $show_tile $protected , force=True)"
+    yunohost tools shell -c "from yunohost.permission import user_permission_update; user_permission_update('$app.$permission' $add $remove $show_tile $protected , force=True)"
 }
 
 # Check if a permission has an user

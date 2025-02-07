@@ -162,7 +162,10 @@ objectClass: top"
         nscd -i group
     fi
 
-    [ -z "$regen_conf_files" ] && exit 0
+    if [ -z "$regen_conf_files" ] && [ $FORCE == "false" ]
+    then
+        exit 0
+    fi
 
     # regenerate LDAP config directory from slapd.conf
     echo "Regenerate LDAP config directory from config.ldif"

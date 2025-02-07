@@ -22,6 +22,7 @@ backup_dir="$1/conf/ynh"
 
 cp -a "${backup_dir}/current_host" /etc/yunohost/current_host
 cp -a "${backup_dir}/firewall.yml" /etc/yunohost/firewall.yml
+cp -a "${backup_dir}/permissions.yml" /etc/yunohost/permissions.yml
 [ ! -d "${backup_dir}/portal" ] || cp -a "${backup_dir]}/portal" /etc/yunohost/portal
 [ ! -d "${backup_dir}/domains" ] || cp -a "${backup_dir}/domains" /etc/yunohost/domains
 [ ! -e "${backup_dir}/settings.yml" ] || cp -a "${backup_dir}/settings.yml" "/etc/yunohost/settings.yml"

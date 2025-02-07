@@ -146,7 +146,7 @@ class AppResource:
 
     def __init__(self, properties: Dict[str, Any], app: str, manager=None):
         self.app = app
-        self.manager = manager
+        self.workdir = manager.workdir if manager else None
         properties = self.default_properties | properties
 
         # It's not guaranteed that this info will be defined, e.g. during unit tests, only small resource snippets are used, not proper manifests
@@ -255,11 +255,7 @@ class AppResource:
         )
         from yunohost.hook import hook_exec_with_script_debug_if_failure
 
-        workdir = (
-            self.manager.workdir
-            if self.manager and self.manager.workdir
-            else _make_tmp_workdir_for_app(app=self.app)
-        )
+        workdir = self.workdir or _make_tmp_workdir_for_app(app=self.app)
 
         env_ = _make_environment_for_app_script(
             self.app,
@@ -680,7 +676,7 @@ class PermissionsResource(AppResource):
         from yunohost.permission import (
             permission_create,
             permission_delete,
-            permission_sync_to_user,
+            _sync_permissions_with_ldap,
             permission_url,
             user_permission_list,
             user_permission_update,
@@ -699,7 +695,7 @@ class PermissionsResource(AppResource):
         ):
             self.set_setting("path", "/")
 
-        existing_perms = user_permission_list(short=True, apps=[self.app])[
+        existing_perms = user_permission_list(apps=[self.app], full=True)[
             "permissions"
         ]
         for perm in existing_perms:
@@ -725,8 +721,6 @@ class PermissionsResource(AppResource):
                 permission_create(
                     perm_id,
                     allowed=init_allowed,
-                    # This is why the ugly hack with self.manager exists >_>
-                    label=self.manager.wanted["name"] if perm == "main" else perm,
                     url=infos["url"],
                     additional_urls=infos["additional_urls"],
                     auth_header=infos["auth_header"],
@@ -739,6 +733,7 @@ class PermissionsResource(AppResource):
                 show_tile=infos["show_tile"],
                 protected=infos["protected"],
                 sync_perm=False,
+                log_success_as_debug=True,
             )
             permission_url(
                 perm_id,
@@ -748,22 +743,22 @@ class PermissionsResource(AppResource):
                 sync_perm=False,
             )
 
-        permission_sync_to_user()
+        _sync_permissions_with_ldap()
 
     def deprovision(self, context: Dict = {}):
         from yunohost.permission import (
             permission_delete,
-            permission_sync_to_user,
+            _sync_permissions_with_ldap,
             user_permission_list,
         )
 
-        existing_perms = user_permission_list(short=True, apps=[self.app])[
+        existing_perms = user_permission_list(apps=[self.app])[
             "permissions"
         ]
         for perm in existing_perms:
             permission_delete(perm, force=True, sync_perm=False)
 
-        permission_sync_to_user()
+        _sync_permissions_with_ldap()
 
 
 class SystemuserAppResource(AppResource):

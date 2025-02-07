@@ -206,18 +206,18 @@ olcMemberOfMemberAD: member
 olcMemberOfMemberOfAD: memberOf
 structuralObjectClass: olcMemberOf
 
-# Link permission <-> groupes
-dn: olcOverlay={1}memberof,olcDatabase={1}mdb,cn=config
-objectClass: olcOverlayConfig
-objectClass: olcMemberOf
-olcOverlay: {1}memberof
-olcMemberOfDangling: error
-olcMemberOfDanglingError: constraintViolation
-olcMemberOfRefInt: TRUE
-olcMemberOfGroupOC: permissionYnh
-olcMemberOfMemberAD: groupPermission
-olcMemberOfMemberOfAD: permission
-structuralObjectClass: olcMemberOf
+# Link permission <-> groupes (OBSOLETE)
+#dn: olcOverlay={1}memberof,olcDatabase={1}mdb,cn=config
+#objectClass: olcOverlayConfig
+#objectClass: olcMemberOf
+#olcOverlay: {1}memberof
+#olcMemberOfDangling: error
+#olcMemberOfDanglingError: constraintViolation
+#olcMemberOfRefInt: TRUE
+#olcMemberOfGroupOC: permissionYnh
+#olcMemberOfMemberAD: groupPermission
+#olcMemberOfMemberOfAD: permission
+#structuralObjectClass: olcMemberOf
 
 # Link permission <-> user
 dn: olcOverlay={2}memberof,olcDatabase={1}mdb,cn=config

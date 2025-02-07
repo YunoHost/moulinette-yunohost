@@ -131,15 +131,11 @@ def app_info(app, full=False, upgradable=False):
 
     setting_path = os.path.join(APPS_SETTING_PATH, app)
     local_manifest = _get_manifest_of_app(setting_path)
-    permissions = user_permission_list(full=True, absolute_urls=True, apps=[app])[
-        "permissions"
-    ]
-
     settings = _get_app_settings(app)
 
     ret = {
         "description": _value_for_locale(local_manifest["description"]),
-        "name": permissions.get(app + ".main", {}).get("label", local_manifest["name"]),
+        "name": settings.get("label", local_manifest["name"]),
         "version": local_manifest.get("version", "-"),
     }
 
@@ -247,12 +243,13 @@ def app_info(app, full=False, upgradable=False):
         and local_manifest["resources"].get("data_dir") is not None
     )
 
-    ret["permissions"] = permissions
-    ret["label"] = permissions.get(app + ".main", {}).get("label")
+    ret["permissions"] = user_permission_list(full=True, absolute_urls=True, apps=[app])[
+        "permissions"
+    ]
 
-    if not ret["label"]:
-        logger.debug(f"Failed to get label for app {app}, maybe it is not a webapp?")
-        ret["label"] = local_manifest["name"]
+    # FIXME : this is the same stuff as "name" ... maybe we should get rid of "name" ?
+    ret["label"] = settings.get("label", local_manifest["name"])
+
     return ret
 
 
@@ -566,7 +563,7 @@ def app_upgrade(
         hook_exec_with_script_debug_if_failure,
         hook_remove,
     )
-    from yunohost.permission import permission_sync_to_user
+    from yunohost.permission import _sync_permissions_with_ldap
     from yunohost.regenconf import manually_modified_files
     from yunohost.utils.legacy import _patch_legacy_helpers
 
@@ -880,7 +877,7 @@ def app_upgrade(
             if upgrade_failed or broke_the_system:
                 if not continue_on_failure or broke_the_system:
                     # display this if there are remaining apps
-                    if apps[number + 1 :]:
+                    if apps[number + 1:]:
                         not_upgraded_apps = apps[number:]
                         if broke_the_system and not continue_on_failure:
                             logger.error(
@@ -950,7 +947,7 @@ def app_upgrade(
             hook_callback("post_app_upgrade", env=env_dict)
             operation_logger.success()
 
-    permission_sync_to_user()
+    _sync_permissions_with_ldap()
 
     logger.success(m18n.n("upgrade_complete"))
 
@@ -1064,7 +1061,7 @@ def app_install(
     from yunohost.permission import (
         permission_create,
         permission_delete,
-        permission_sync_to_user,
+        _sync_permissions_with_ldap,
         user_permission_list,
     )
     from yunohost.regenconf import manually_modified_files
@@ -1155,12 +1152,19 @@ def app_install(
         shutil.rmtree(app_setting_path)
     os.makedirs(app_setting_path)
 
+    # Hotfix for bug in the webadmin while we fix the actual issue :D
+    if label == "undefined":
+        label = None
+
     # Set initial app settings
     app_settings = {
         "id": app_instance_name,
         "install_time": int(time.time()),
         "current_revision": manifest.get("remote", {}).get("revision", "?"),
     }
+
+    if label:
+        app_settings["label"] = label
 
     # If packaging_format v2+, save all install options as settings
     if packaging_format >= 2:
@@ -1186,15 +1190,6 @@ def app_install(
                 recursive=True,
             )
 
-    # Hotfix for bug in the webadmin while we fix the actual issue :D
-    if label == "undefined":
-        label = None
-
-    # Override manifest name by given label
-    # This info is also later picked-up by the 'permission' resource initialization
-    if label:
-        manifest["name"] = label
-
     if packaging_format >= 2:
         from yunohost.utils.resources import AppResourceManager
 
@@ -1216,7 +1211,6 @@ def app_install(
         permission_create(
             app_instance_name + ".main",
             allowed=["all_users"],
-            label=manifest["name"],
             show_tile=False,
             protected=False,
         )
@@ -1358,7 +1352,7 @@ def app_install(
             shutil.rmtree(app_setting_path)
             shutil.rmtree(extracted_app_folder)
 
-            permission_sync_to_user()
+            _sync_permissions_with_ldap()
 
             raise YunohostError(failure_message_with_debug_instructions, raw_msg=True)
 
@@ -1408,7 +1402,7 @@ def app_remove(operation_logger, app, purge=False, force_workdir=None):
     from yunohost.hook import hook_callback, hook_exec, hook_remove
     from yunohost.permission import (
         permission_delete,
-        permission_sync_to_user,
+        _sync_permissions_with_ldap,
         user_permission_list,
     )
     from yunohost.utils.legacy import _patch_legacy_helpers
@@ -1494,7 +1488,7 @@ def app_remove(operation_logger, app, purge=False, force_workdir=None):
     else:
         logger.warning(m18n.n("app_not_properly_removed", app=app))
 
-    permission_sync_to_user()
+    _sync_permissions_with_ldap()
     _assert_system_is_sane_for_app(manifest, "post")
 
 
@@ -1590,7 +1584,7 @@ def app_register_url(app, domain, path):
         path -- The path to be registered (e.g. /coffee)
     """
     from yunohost.permission import (
-        permission_sync_to_user,
+        _sync_permissions_with_ldap,
         permission_url,
         user_permission_update,
     )
@@ -1621,13 +1615,12 @@ def app_register_url(app, domain, path):
     # the tile using the permission helpers.
     permission_url(app + ".main", url="/", sync_perm=False)
     user_permission_update(app + ".main", show_tile=True, sync_perm=False)
-    permission_sync_to_user()
+    _sync_permissions_with_ldap()
 
 
-def app_ssowatconf():
+def app_ssowatconf() -> None:
     """
     Regenerate SSOwat configuration file
-
 
     """
     from yunohost.domain import (
@@ -1635,13 +1628,13 @@ def app_ssowatconf():
         _get_raw_domain_settings,
         domain_list,
     )
-    from yunohost.permission import user_permission_list
+    from yunohost.permission import AppPermInfos, user_permission_list
 
     domain_portal_dict = _get_domain_portal_dict()
 
     domains = domain_list()["domains"]
     portal_domains = domain_list(exclude_subdomains=True)["domains"]
-    all_permissions = user_permission_list(
+    all_permissions: dict[str, AppPermInfos] = user_permission_list(
         full=True, ignore_system_perms=True, absolute_urls=True
     )["permissions"]
 
@@ -1681,7 +1674,9 @@ def app_ssowatconf():
             redirected_urls[domain + "/"] = domain_portal_dict[domain]
 
     # Will organize apps by portal domain
-    portal_domains_apps = {domain: {} for domain in portal_domains}
+    portal_domains_apps: dict[str, dict[str, dict]] = {
+        domain: {} for domain in portal_domains
+    }
 
     # This check is to prevent an issue during postinstall if the catalog cant
     # be initialized (because of offline postinstall) and it's not a big deal
@@ -1694,10 +1689,11 @@ def app_ssowatconf():
 
     # New permission system
     for perm_name, perm_info in all_permissions.items():
+
         uris = (
             []
-            + ([perm_info["url"]] if perm_info["url"] else [])
-            + perm_info["additional_urls"]
+            + ([perm_info["url"]] if perm_info.get("url") else [])
+            + perm_info.get("additional_urls", [])
         )
 
         # Ignore permissions for which there's no url defined
@@ -1770,16 +1766,19 @@ def app_ssowatconf():
             "users": perm_info["corresponding_users"],
             "public": "visitors" in perm_info["allowed"],
             "url": uris[0],
-            "description": local_manifest["description"],
+            "description": perm_info.get("description") or local_manifest["description"],
+            "order": perm_info.get("order", 100),
         }
 
-        # FIXME : find a smarter way to get this info ? (in the settings maybe..)
-        # Also ideally we should not rely on the webadmin route for this, maybe expose these through a different route in nginx idk
-        # Also related to "people will want to customize those.."
-        app_catalog_info = apps_catalog.get(app_id.split("__")[0])
-        if app_catalog_info and "logo_hash" in app_catalog_info:
+        if perm_info.get("hide_from_public"):
+            app_portal_info["hide_from_public"] = True
+
+        # Logo may be customized via the perm setting, otherwise we use the default logo that we fetch from the catalog infos
+        app_base_id = app_id.split("__")[0]
+        logo_hash = perm_info.get("logo_hash") or apps_catalog.get(app_base_id, {}).get("logo_hash")
+        if logo_hash:
             app_portal_info["logo"] = (
-                f"/yunohost/sso/applogos/{app_catalog_info['logo_hash']}.png"
+                f"/yunohost/sso/applogos/{logo_hash}.png"
             )
 
         portal_domains_apps[app_portal_domain][perm_name] = app_portal_info
@@ -1823,19 +1822,14 @@ def app_ssowatconf():
 
 @is_unit_operation(flash=True)
 def app_change_label(app, new_label):
-    from yunohost.permission import user_permission_update
 
     installed = _is_installed(app)
     if not installed:
         raise YunohostValidationError(
             "app_not_installed", app=app, all_apps=_get_all_installed_apps_id()
         )
-    logger.warning(m18n.n("app_label_deprecated"))
-    user_permission_update(app + ".main", label=new_label)
 
-
-# actions todo list:
-# * docstring
+    app_setting(app, "label", new_label)
 
 
 def app_action_list(app):

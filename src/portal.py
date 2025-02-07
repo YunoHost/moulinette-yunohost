@@ -55,7 +55,7 @@ def _get_user_infos(
 
 def _get_portal_settings(
     domain: Union[str, None] = None, username: Union[str, None] = None
-):
+) -> dict[str, Any]:
     """
     Returns domain's portal settings which are a combo of domain's portal config panel options
     and the list of apps availables on this domain computed by `app.app_ssowatconf()`.
@@ -101,19 +101,27 @@ def _get_portal_settings(
     if username:
         # Add user allowed or public apps
         settings["apps"] = {
-            name: app
-            for name, app in apps.items()
-            if username in app["users"] or app["public"]
+            app: infos
+            for app, infos in apps.items()
+            if username in infos["users"] or infos["public"]
         }
     elif settings["public"]:
         # Add public apps (e.g. with "visitors" in group permission)
-        settings["apps"] = {name: app for name, app in apps.items() if app["public"]}
+        settings["apps"] = {
+            app: infos
+            for app, infos in apps.items()
+            if infos["public"] and not infos.get("hide_from_public")
+        }
+
+    # Sort dictionnary according to the "order" info
+    settings["apps"] = dict(sorted([(app, infos) for app, infos in settings["apps"].items()], key=lambda v: (v[1].get("order", 100), v[0])))
 
     return settings
 
 
 def portal_public():
-    """Get public settings
+    """
+    Get public settings
     If the portal is set as public, it will include the list of public apps
     """
 

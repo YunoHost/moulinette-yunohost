@@ -55,7 +55,6 @@ objectClass: posixGroup
 objectClass: groupOfNamesYnh
 gidNumber: 4002
 cn: all_users
-permission: cn=mail.main,ou=permission,dc=yunohost,dc=org
 
 dn: cn=visitors,ou=groups,dc=yunohost,dc=org
 objectClass: posixGroup
@@ -64,32 +63,19 @@ gidNumber: 4003
 cn: visitors
 
 dn: cn=mail.main,ou=permission,dc=yunohost,dc=org
-groupPermission: cn=all_users,ou=groups,dc=yunohost,dc=org
 cn: mail.main
 objectClass: posixGroup
 objectClass: permissionYnh
-isProtected: TRUE
-label: E-mail
 gidNumber: 5001
-showTile: FALSE
-authHeader: FALSE
 
 dn: cn=ssh.main,ou=permission,dc=yunohost,dc=org
 cn: ssh.main
 objectClass: posixGroup
 objectClass: permissionYnh
-isProtected: TRUE
-label: SSH
 gidNumber: 5003
-showTile: FALSE
-authHeader: FALSE
 
 dn: cn=sftp.main,ou=permission,dc=yunohost,dc=org
 cn: sftp.main
 objectClass: posixGroup
 objectClass: permissionYnh
-isProtected: TRUE
-label: SFTP
 gidNumber: 5004
-showTile: FALSE
-authHeader: FALSE
