@@ -365,10 +365,27 @@ user:
                             help: Permission to manage (e.g. mail or nextcloud or wordpress.editors) (use "yunohost user permission list" and "yunohost user permission -f" to see all the current permissions)
                         -l:
                             full: --label
-                            help: Label for this permission. This label will be shown on the SSO and in the admin
+                            help: Custom label for this app / permission
                         -s:
                             full: --show_tile
-                            help: Define if a tile will be shown in the SSO
+                            help: Define if a tile will be shown in the user portal
+                            choices:
+                                - 'True'
+                                - 'False'
+                        -L:
+                            full: --logo
+                            help: File to use as logo for this app / permission. Only PNG are supported.
+                            type: argparse.FileType('rb')
+                        -d:
+                            full: --description
+                            help: Custom description for this app / permission
+                        -o:
+                            full: --order
+                            help: Order number to be used when displaying the tiles in the user portal. Default is 100 so set this to any low value for the tile to appear first, or higher value to appear last.
+                            type: int
+                        -H:
+                            full: --hide_from_public
+                            help: Mark the tile as to be hidden from the 'public app list' (if enabled). Useful for apps such as Nextcloud that need to be exposed to be publicly exposed for desktop/mobile client to be able to connect to, but not meant to be listed for visitors.
                             choices:
                                 - 'True'
                                 - 'False'

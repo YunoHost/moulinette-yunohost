@@ -24,7 +24,7 @@ import random
 import re
 import os
 from logging import getLogger
-from typing import TYPE_CHECKING, Literal, TypedDict, NotRequired, cast
+from typing import TYPE_CHECKING, BinaryIO, Literal, TypedDict, NotRequired, cast
 
 from moulinette import m18n
 from moulinette.utils.filesystem import read_yaml, write_to_yaml
@@ -56,6 +56,10 @@ class AppPermInfos(SystemPermInfos):
     auth_header: bool
     protected: bool
     show_tile: bool | None
+    hide_from_public: NotRequired[bool]
+    logo_hash: NotRequired[str]
+    description: NotRequired[str]
+    order: NotRequired[int]
 
 
 PermInfos = AppPermInfos | SystemPermInfos
@@ -81,10 +85,6 @@ def user_permission_list(
     from yunohost.app import _installed_apps, _get_app_settings
     from yunohost.user import user_group_list
 
-    map_group_to_users = {
-        g: infos["members"] for g, infos in user_group_list()["groups"].items()
-    }
-
     # Parse / organize information to be outputed
     filter_ = apps
     if filter_:
@@ -97,13 +97,15 @@ def user_permission_list(
         settings = _get_app_settings(app)
 
         subperms = settings.get("_permissions", {})
-        default_app_label = settings.get("label") or app.title()
         if "main" not in subperms:
             subperms["main"] = {}
+
+        app_label = subperms["main"].get("label") or settings.get("label") or app.title()
+
         for subperm, infos in subperms.items():
             name = f"{app}.{subperm}"
             perm: AppPermInfos = {
-                "label": default_app_label,
+                "label": "",
                 "url": None,
                 "additional_urls": [],
                 "auth_header": True,
@@ -113,7 +115,12 @@ def user_permission_list(
             }
             perm.update(infos)
             if subperm != "main":
-                perm["label"] += " (" + settings.get("label", subperm) + ")"
+                # Redefine the subperm label to : <main_label> (<subperm>)
+                subperm_label = (perm["label"] or subperm.title())
+                perm["label"] = f"{app_label} ({subperm_label})"
+            elif not perm["label"]:
+                perm["label"] = app_label
+
             if perm["show_tile"] is None and perm["url"] is not None:
                 perm["show_tile"] = True
 
@@ -147,18 +154,27 @@ def user_permission_list(
             permissions[f"{name}.main"] = system_perm_conf[name]
 
     if full:
-        for permission in permissions.values():
-            permission["corresponding_users"] = set()
-            for group in permission["allowed"]:
+        map_group_to_users = {
+            g: infos["members"] for g, infos in user_group_list()["groups"].items()
+        }
+        for infos in permissions.values():
+            infos["corresponding_users"] = set()
+            for group in infos["allowed"]:
                 # FIXME: somewhere we may want to have some sort of garbage collection
                 # to automatically remove user/groups from the "allowed" info when they
-                # somehow disappared from the system (for example this may happen when
+                # somehow disappeared from the system (for example this may happen when
                 # restoring an app on which not all the user/group exist)
                 users_in_group = set(map_group_to_users.get(group, []))
-                permission["corresponding_users"] |= users_in_group  # type: ignore
-            permission["corresponding_users"] = list(
-                sorted(permission["corresponding_users"])
+                infos["corresponding_users"] |= users_in_group
+            infos["corresponding_users"] = list(
+                sorted(infos["corresponding_users"])
             )
+    else:
+        # Keep the output concise when used without --full, meant to not bloat CLI
+        for infos in permissions.values():
+            for key in ["additional_urls", "auth_header", "logo_hash", "order", "protected", "show_tile"]:
+                if key in infos:
+                    del infos[key]
 
     return {"permissions": permissions}
 
@@ -267,13 +283,6 @@ def user_permission_update(
     if "all_users" in new_allowed_groups and len(new_allowed_groups) >= 2:
         if "visitors" not in new_allowed_groups or len(new_allowed_groups) >= 3:
             logger.warning(m18n.n("permission_currently_allowed_for_all_users"))
-
-    # Note that we can get this argument as string if we it come from the CLI
-    if isinstance(show_tile, str):
-        if show_tile.lower() == "true":
-            show_tile = True
-        else:
-            show_tile = False
 
     if (
         existing_permission.get("url")
@@ -560,7 +569,7 @@ def permission_url(
 def permission_delete(
     permission: str, force: bool = False, sync_perm: bool = True
 ) -> None:
-    from yunohost.app import app_setting, _is_installed, app_ssowatconf
+    from yunohost.app import app_setting, _assert_is_installed, app_ssowatconf
 
     # By default, manipulate main permission
     if "." not in permission:
@@ -571,12 +580,16 @@ def permission_delete(
 
     app, subperm = permission.split(".")
 
-    if _is_installed(app):
-        # Actually delete the permission
-        perm_settings = app_setting(app, "_permissions") or {}
-        if subperm in perm_settings:
-            del perm_settings[subperm]
-        app_setting(app, "_permissions", perm_settings)
+    if app in SYSTEM_PERMS:
+        raise YunohostValidationError(f"Cannot delete system permission {permission}", raw_msg=True)
+
+    _assert_is_installed(app)
+
+    # Actually delete the permission
+    perm_settings = app_setting(app, "_permissions") or {}
+    if subperm in perm_settings:
+        del perm_settings[subperm]
+    app_setting(app, "_permissions", perm_settings)
 
     if sync_perm:
         _sync_permissions_with_ldap()
@@ -699,6 +712,10 @@ def _update_app_permission_setting(
     show_tile: bool | None = None,
     protected: bool | None = None,
     allowed: str | list[str] | None = None,
+    logo: BinaryIO | None = None,
+    description: str | None = None,
+    hide_from_public: bool | None = None,
+    order: int | None = None,
 ) -> None:
     from yunohost.app import app_setting
 
@@ -710,6 +727,30 @@ def _update_app_permission_setting(
 
     if label is not None:
         update_settings["label"] = str(label)
+
+    if description is not None:
+        update_settings["description"] = description
+
+    if hide_from_public is not None:
+        update_settings["hide_from_public"] = hide_from_public
+
+    if order is not None:
+        update_settings["order"] = order
+
+    if logo is not None:
+
+        from yunohost.app import APPS_CATALOG_LOGOS
+        import hashlib
+
+        logo_content = logo.read()
+        if not logo_content.startswith(b"\x89PNG\r\n\x1a\n"):
+            raise YunohostValidationError("The provided logo file doesn't seem to be a PNG file. Only PNG logos are supported.", raw_msg=True)
+
+        logo_hash = hashlib.sha256(logo_content).hexdigest()
+        with open(f"{APPS_CATALOG_LOGOS}/{logo_hash}.png", "wb") as f:
+            f.write(logo_content)
+
+        update_settings["logo_hash"] = logo_hash
 
     if protected is not None:
         update_settings["protected"] = protected

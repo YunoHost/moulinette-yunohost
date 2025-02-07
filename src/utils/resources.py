@@ -695,7 +695,7 @@ class PermissionsResource(AppResource):
         ):
             self.set_setting("path", "/")
 
-        existing_perms = user_permission_list(apps=[self.app])[
+        existing_perms = user_permission_list(apps=[self.app], full=True)[
             "permissions"
         ]
         for perm in existing_perms:
