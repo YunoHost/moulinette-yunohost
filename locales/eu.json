@@ -223,7 +223,7 @@
     "app_restore_failed": "Ezinezkoa izan da {app} lehengoratzea: {error}",
     "diagnosis_apps_allgood": "Instalatutako aplikazioak bat datoz oinarrizko pakete-jarraibideekin",
     "diagnosis_apps_bad_quality": "Aplikazio hau hondatuta dagoela dio YunoHosten aplikazioen katalogoak. Agian behin-behineko kontua da arduradunak arazoa konpondu bitartean. Oraingoz, ezin da aplikazioa eguneratu.",
-    "diagnosis_apps_broken": "Aplikazio hau YunoHosten aplikazioen katalogoan hondatuta dagoela ageri da. Agian behin-behineko kontua da arduradunak konpondu bitartean. Oraingoz, ezin da aplikazioa eguneratu.",
+    "diagnosis_apps_broken": "Aplikazio hau hondatuta dagoela ageri da YunoHosten aplikazioen katalogoan. Agian behin-behineko kontua da arduradunak konpondu bitartean. Oraingoz, ezin da aplikazioa eguneratu.",
     "diagnosis_apps_deprecated_practices": "Instalatutako aplikazio honen bertsioak oraindik darabiltza zaharkitutako pakete-jarraibideak. Eguneratzea hausnartu beharko zenuke.",
     "diagnosis_apps_issue": "Arazo bat dago {app} aplikazioarekin",
     "diagnosis_apps_not_in_app_catalog": "Aplikazio hau ez da YunoHosten aplikazioen katalogokoa. Iraganean egon bazen eta orain ez badago, desinstalatzea litzateke onena, ez baitu eguneraketarik jasoko eta sistemaren integritate eta segurtasuna arriskuan jar lezakeelako.",
