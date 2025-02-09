@@ -18,7 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-readonly export RBENV_ROOT="/opt/rbenv"
+readonly RBENV_ROOT="/opt/rbenv"
+export RBENV_ROOT
 
 _ynh_load_ruby_in_path_and_other_tweaks() {
 
@@ -119,6 +120,7 @@ _ynh_ruby_cleanup() {
     local installed_ruby_versions=$(rbenv versions --bare --skip-aliases | grep -Ev '/')
     for installed_ruby_version in $installed_ruby_versions; do
         if ! grep -qE "^ruby_version: '?$installed_ruby_version'?" /etc/yunohost/apps/*/settings.yml
+        then
             ynh_print_info "Removing Ruby-$installed_ruby_version"
             $RBENV_ROOT/bin/rbenv uninstall --force "$installed_ruby_version"
         fi

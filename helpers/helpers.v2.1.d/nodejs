@@ -18,7 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-readonly export N_PREFIX="/opt/node_n"
+readonly N_PREFIX="/opt/node_n"
+export N_PREFIX
 
 # [internal]
 _ynh_load_nodejs_in_path_and_other_tweaks() {

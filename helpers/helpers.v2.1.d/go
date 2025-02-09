@@ -18,7 +18,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-readonly export GOENV_ROOT="/opt/goenv"
+readonly GOENV_ROOT="/opt/goenv"
+export GOENV_ROOT
 
 _ynh_load_go_in_path_and_other_tweaks() {
 
@@ -109,6 +110,7 @@ _ynh_go_cleanup() {
     local installed_go_versions=$($GOENV_ROOT/bin/goenv versions --bare --skip-aliases | grep -Ev '/')
     for installed_go_version in $installed_go_versions; do
         if ! grep -qE "^go_version: '?$installed_go_version'?" /etc/yunohost/apps/*/settings.yml
+        then
             ynh_print_info "Removing Go-$installed_go_version"
             $GOENV_ROOT/bin/goenv uninstall --force "$installed_go_version"
         fi

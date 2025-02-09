@@ -600,3 +600,32 @@ ynh_smart_mktemp() {
 
     echo "$(mktemp --directory --tmpdir="$tmpdir")"
 }
+
+
+# Setup/update a git clone, meant to be used internally to fetch technical tools like goenv, rbenv
+#
+# [internal]
+#
+function _ynh_git_clone()
+{
+    local url="$1"
+    local dest_dir="$2"
+    # FIXME: hmmm we might want some way to specify the branch ? idk
+    #local url="$(cut -f1 -d: <<< "$url_and_branch")"
+    #local branch="$(cut -f2 -d: <<< "$url_and_branch")"
+    local branch
+    branch=${branch:-master}
+
+    mkdir -p "$dest_dir"
+    pushd "$dest_dir" || return 1
+        if ! [ -d "$dest_dir/.git" ]
+        then
+            git init -q
+            git remote add origin "$url"
+        else
+            git remote set-url origin "$url"
+        fi
+        git fetch -q --tags --prune origin "$branch"
+        git reset --hard origin/"$branch"
+    popd || return 1
+}
