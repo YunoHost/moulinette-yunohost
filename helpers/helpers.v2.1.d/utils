@@ -246,9 +246,14 @@ _ynh_apply_default_permissions() {
     # App files can have files of their own
     if ynh_system_user_exists --username="$app"; then
         # If this is a file in $install_dir or $data_dir : it should be owned and read+writable by $app only
-        if [ -f "$target" ] && (is_in_dir "$target" "${install_dir:-}" || is_in_dir "$target" "${data_dir:-}" || is_in_dir "$target" "/etc/$app"); then
-            chmod 600 "$target"
-            chown "$app:$app" "$target"
+        if (is_in_dir "$target" "${install_dir:-}" || is_in_dir "$target" "${data_dir:-}" || is_in_dir "$target" "/etc/$app"); then
+            if [ -d "$target" ]; then
+              chmod -R u+rwX "$target"
+              chown -R "$app:$app" "$target"
+            else
+              chmod 600 "$target"
+              chown "$app:$app" "$target"
+            fi
             return
         fi
         # If this is the install dir (so far this is the only way this helper is called with a directory - along with $data_dir via ynh_restore?)
