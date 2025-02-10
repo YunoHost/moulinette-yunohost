@@ -49,6 +49,14 @@ def _parse_api_args() -> argparse.Namespace:
         type=int,
         help="Port to listen on (default: %d)" % DEFAULT_PORT,
     )
+    srv_group.add_argument(
+        "-s",
+        "--socket",
+        action="store",
+        default=None,
+        type=str,
+        help="Socket path to listen on (default is none) without authentication"
+    )
     glob_group = parser.add_argument_group("global arguments")
     glob_group.add_argument(
         "--debug",
@@ -68,4 +76,4 @@ def _parse_api_args() -> argparse.Namespace:
 if __name__ == "__main__":
     opts = _parse_api_args()
     # Run the server
-    yunohost.api(debug=opts.debug, host=opts.host, port=opts.port)
+    yunohost.api(debug=opts.debug, host=opts.host, port=opts.port, socket=opts.socket)

@@ -37,6 +37,7 @@ _global:
     authentication:
         api: ldap_admin
         cli: null
+        sockapi: sockapi
 
 #############################
 #           User            #
