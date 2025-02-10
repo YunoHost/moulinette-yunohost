@@ -100,6 +100,11 @@ do_post_regen() {
     short_hostname=$(hostname -s)
     grep -q "127.0.0.1.*$short_hostname" /etc/hosts || echo -e "\n127.0.0.1\t$short_hostname" >> /etc/hosts
 
+    # For SMTP connexion from apps wich request valid certificate we need to force main domain to point to localhost ip
+    # because connexion on external ip is forbinden by mail server for apps.
+    main_domain=$(yunohost domain main-domain --output-as plain)
+    grep -q "127.0.0.1.*$main_domain" /etc/hosts || echo -e "\n127.0.0.1\t$main_domain" >>/etc/hosts
+
     [[ -n "$regen_conf_files" ]] || return 0
 
     # Remove / disable services likely to conflict with dnsmasq
