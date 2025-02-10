@@ -226,7 +226,7 @@
     "diagnosis_found_errors": "Found {errors} significant issue(s) related to {category}!",
     "diagnosis_found_errors_and_warnings": "Found {errors} significant issue(s) (and {warnings} warning(s)) related to {category}!",
     "diagnosis_found_warnings": "Found {warnings} item(s) that could be improved for {category}.",
-    "diagnosis_high_number_auth_failures": "There's been a suspiciously high number of authentication failures recently. You may want to make sure that fail2ban is running and is correctly configured, or use a custom port for SSH as explained in https://yunohost.org/security.",
+    "diagnosis_high_number_auth_failures": "There's been a suspiciously high number of authentication failures recently. You may want to make sure that fail2ban is running and is correctly configured, disable password authentication and use a SSH key instead or use a custom port for SSH as explained in https://yunohost.org/security.",
     "diagnosis_http_bad_status_code": "It looks like another machine (maybe your internet router) answered instead of your server.<br>1. The most common cause for this issue is that port 80 (and 443) <a href='https://yunohost.org/isp_box_config'>are not correctly forwarded to your server</a>.<br>2. On more complex setups: make sure that no firewall or reverse-proxy is interfering.",
     "diagnosis_http_connection_error": "Connection error: could not connect to the requested domain, it's very likely unreachable.",
     "diagnosis_http_could_not_diagnose": "Could not diagnose if domains are reachable from outside in IPv{ipversion}.",
