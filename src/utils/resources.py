@@ -1626,7 +1626,7 @@ class NodejsAppResource(AppResource):
             cmd += " --arch=arm64"
 
         self._run_script(
-            "provision_or_update", " ".join(cmd), env={"N_PREFIX": self.N_INSTALL_DIR}
+            "provision_or_update", cmd, env={"N_PREFIX": self.N_INSTALL_DIR}
         )
         self.garbage_collect_unused_versions()
 
