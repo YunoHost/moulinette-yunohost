@@ -175,4 +175,27 @@ i18n = "global_settings_setting"
         pattern.regexp = '^(([^\W_A-Z]+([-]*[^\W_A-Z]+)*\.)+((xn--)?[^\W_]{2,}));(([^\W_A-Z]+([-]*[^\W_A-Z]+)*\.)+((xn--)?([^\W_]{2,}|[0-9]{1,3})));[0-9]{1,}$'
         pattern.error = "You should specify a list of items formatted as DOMAIN;DESTINATION;DESTPORT, such as yolo.test;192.168.1.42;443"
         default = ""
-        visible = "tls_passthrough_enabled"
+        visible = "tls_passthrough_enabled"   
+
+[swap]
+name = "Swap"
+    [swap.swapfile]
+    name = "Swap file configuration"
+        [swap.swapfile.swapfile_warning]
+        ask = "Absolutely do not create a swap file if your root partition is on a SD card!"
+        help = "The intensive writing on the SD card will degrade it fast."
+        type = "alert"
+        style = "warning"
+
+        [swap.swapfile.swapfile_enabled]
+        ask = "Do you need to create a swap file?"
+        help = "A swap file will extend the available RAM by using some of your storage space."
+        type = "boolean"
+        default = false
+
+        [swap.swapfile.swapfile_size]
+        ask = "How many Mebibytes should the swap file be?"
+        help = "Only integers are accepted ( 1 MiB = 1024 B). Beware, if you reduce its current size, you may crash your server."
+        type = "number"
+        default = 1024
+        visible = "swapfile_enabled"
