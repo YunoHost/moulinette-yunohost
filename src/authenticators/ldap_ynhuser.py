@@ -27,6 +27,7 @@ from pathlib import Path
 
 import jwt
 import ldap
+import ldap.filter
 import ldap.sasl
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import padding
@@ -200,6 +201,13 @@ class Authenticator(BaseAuthenticator):
             username, password = credentials.split(":", 1)
         except ValueError:
             raise YunohostError("invalid_credentials")
+
+        username = ldap.filter.escape_filter_chars(username)
+        # Search username, if user give a mail instead
+        if "@" in username:
+            user = _get_ldap_interface().search("ou=users", f"mail={username}", ["uid"])
+            if len(user) != 0:
+                username = user[0]['uid'][0]
 
         def _reconnect():
             con = ldap.ldapobject.ReconnectLDAPObject(URI, retry_max=2, retry_delay=0.5)
