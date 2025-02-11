@@ -717,7 +717,7 @@
     "pydantic_value_error_url_host": "URL host invalid",
     "pydantic_value_error_url_port": "URL port invalid, port cannot exceed 65535",
     "pydantic_value_error_url_scheme": "Invalid or missing URL scheme",
-    "regenconf_dry_pending_applying": "Checking pending configuration which would have been applied for category '{category}'...",
+    "regenconf_dry_pending_applying": "Checking pending configuration which would have been applied for category '{category}'…",
     "regenconf_failed": "Could not regenerate the configuration for category(s): {categories}",
     "regenconf_file_backed_up": "Configuration file '{conf}' backed up to '{backup}'",
     "regenconf_file_copy_failed": "Could not copy the new configuration file '{new}' to '{conf}'",
