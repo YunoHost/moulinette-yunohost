@@ -31,6 +31,12 @@ portal:
                         pattern: &pattern_fullname
                             - !!str ^([^\W_]{1,30}[ ,.'-]{0,3})+$
                             - "pattern_fullname"
+                --mainemail:
+                    help: Main email
+                    extra:
+                        pattern: &pattern_email
+                            - !!str ^[\w.-]+@([^\W_A-Z]+([-]*[^\W_A-Z]+)*\.)+((xn--)?[^\W_]{2,})$
+                            - "pattern_email"
                 --mailforward:
                     help: Mailforward addresses to add
                     nargs: "*"
@@ -44,9 +50,7 @@ portal:
                     nargs: "*"
                     metavar: MAIL
                     extra:
-                        pattern: &pattern_email
-                            - !!str ^[\w.-]+@([^\W_A-Z]+([-]*[^\W_A-Z]+)*\.)+((xn--)?[^\W_]{2,})$
-                            - "pattern_email"
+                        pattern: *pattern_email
                 --currentpassword:
                     help: Current password
                     nargs: "?"
