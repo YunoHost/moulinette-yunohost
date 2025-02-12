@@ -270,7 +270,7 @@ class Authenticator(BaseAuthenticator):
             secure=True,
             httponly=True,
             path="/",
-            samesite="strict" if not is_dev else None,
+            samesite="lax" if not is_dev else None,
             domain=f".{request.get_header('host')}",
             max_age=SESSION_VALIDITY
             - 600,  # remove 1 minute such that cookie expires on the browser slightly sooner on browser side, just to help desimbuigate edge case near the expiration limit
@@ -323,7 +323,7 @@ class Authenticator(BaseAuthenticator):
             secure=True,
             httponly=True,
             path="/",
-            samesite="strict" if not is_dev else None,
+            samesite="lax" if not is_dev else None,
             domain=f".{request.get_header('host')}",
             max_age=SESSION_VALIDITY
             - 600,  # remove 1 minute such that cookie expires on the browser slightly sooner on browser side, just to help desimbuigate edge case near the expiration limit
