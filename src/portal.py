@@ -75,7 +75,7 @@ def _get_portal_settings(
         "portal_theme": "system",
         "portal_tile_theme": "simple",
         "portal_title": "YunoHost",
-        "show_other_domains_apps": False,
+        "show_other_domains_apps": True,
         "domain": domain,
     }
 
