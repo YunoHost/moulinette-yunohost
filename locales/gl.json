@@ -693,7 +693,7 @@
     "global_settings_setting_dns_exposure": "Versións de IP a ter en conta para a configuración DNS e diagnóstico",
     "global_settings_setting_dns_exposure_help": "Nota: Esto só lle afecta á configuración DNS recomendada e diagnóstico do sistema. Non lle afecta aos axustes do sistema.",
     "diagnosis_ip_no_ipv6_tip_important": "Se está dispoñible, IPv6 debería estar automáticamente configurado polo sistema ou o teu provedor. Se non, pode que teñas que facer algúns axustes manualmente tal como se explica na documentación: <a href='https://yunohost.org/ipv6'>https://yunohost.org/ipv6</a>.",
-    "domain_config_default_app_help": "As persoas serán automáticamente redirixidas a esta app ao abrir o dominio. Se non se indica ningunha, serán redirixidas ao formulario de acceso no portal de usuarias.",
+    "domain_config_default_app_help": "As persoas serán automáticamente redirixidas a esta app ao abrir o dominio. Se non se indica ningunha, serán redirixidas ao formulario de acceso no portal.",
     "app_change_url_failed": "Non se cambiou o url para {app}: {error}",
     "app_change_url_require_full_domain": "{app} non se pode mover a este novo URL porque require un dominio completo propio (ex. con ruta = /)",
     "app_change_url_script_failed": "Algo fallou ao executar o script de cambio de url",
