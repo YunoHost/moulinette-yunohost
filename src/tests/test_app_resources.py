@@ -19,9 +19,11 @@
 #
 
 import os
+import tempfile
 
 import pytest
 from moulinette.utils.process import check_output
+from subprocess import check_call
 
 from yunohost.app import app_setting
 from yunohost.domain import _get_maindomain
@@ -412,3 +414,112 @@ def test_resource_permissions():
 
     res = user_permission_list(full=True)["permissions"]
     assert "testapp.main" not in res
+
+
+def test_resource_nodejs():
+
+    os.system("echo '[integration]' >> /etc/yunohost/apps/testapp/manifest.toml")
+    os.system("echo 'helpers_version = \"2.1\"' >> /etc/yunohost/apps/testapp/manifest.toml")
+
+    r = AppResourceClassesByType["nodejs"]
+    assert not app_setting("testapp", "nodejs_version")
+    conf = {
+        "version": "20",
+    }
+
+    r(conf, "testapp").provision_or_update()
+
+    nodejs_version = app_setting("testapp", "nodejs_version")
+    assert nodejs_version
+    nodejs_dir = f"{r.N_INSTALL_DIR}/n/versions/node/{nodejs_version}/bin"
+    assert os.path.exists(nodejs_dir)
+
+    env = {
+        "N_PREFIX": r.N_INSTALL_DIR,
+        "PATH": f"{nodejs_dir}:{os.environ['PATH']}",
+    }
+
+    assert check_output("which node", env=env).startswith(nodejs_dir)
+    installed_version = check_output("node --version", env=env)
+    assert installed_version.startswith("v20.")
+    with tempfile.TemporaryDirectory(prefix="ynh_") as d:
+        # Install a random simple package to validate npm is in the path and working
+        check_call("npm install ansi-styles", cwd=d.name, env=env)
+        # FIXME: the resource should install stuff as non-root probably ?
+        assert os.path.exists(f"{d.name}/node_modules/")
+
+    # FIXME: should also test and validate deprovisioning
+
+
+def test_resource_ruby():
+
+    os.system("echo '[integration]' >> /etc/yunohost/apps/testapp/manifest.toml")
+    os.system("echo 'helpers_version = \"2.1\"' >> /etc/yunohost/apps/testapp/manifest.toml")
+
+    r = AppResourceClassesByType["ruby"]
+    assert not app_setting("testapp", "ruby_version")
+    conf = {
+        "version": "3.3.5",
+    }
+
+    r(conf, "testapp").provision_or_update()
+
+    ruby_version = app_setting("testapp", "ruby_version")
+    assert ruby_version
+    ruby_dir = f"{r.RBENV_ROOT}/versions/testapp/bin"
+    assert os.path.exists(ruby_dir)
+
+    env = {
+        "PATH": f"{ruby_dir}:{os.environ['PATH']}",
+    }
+
+    assert check_output("which ruby", env=env).startswith(ruby_dir)
+    assert check_output("which gem", env=env).startswith(ruby_dir)
+    assert "3.3.5" in check_output("ruby --version", env=env)
+    with tempfile.TemporaryDirectory(prefix="ynh_") as d:
+        # Install a random simple package to validate the path etc
+        check_call("gem install bundler passenger --no-document", cwd=d.name, env=env)
+        check_call("bundle config set --local without 'development test'", cwd=d.name, env=env)
+        # FIXME: the resource should install stuff as non-root probably ?
+
+    # FIXME: should also test and validate deprovisioning
+
+
+def test_resource_go():
+
+    os.system("echo '[integration]' >> /etc/yunohost/apps/testapp/manifest.toml")
+    os.system("echo 'helpers_version = \"2.1\"' >> /etc/yunohost/apps/testapp/manifest.toml")
+
+    r = AppResourceClassesByType["go"]
+    assert not app_setting("testapp", "go_version")
+    conf = {
+        "version": "1.22",
+    }
+
+    r(conf, "testapp").provision_or_update()
+
+    go_version = app_setting("testapp", "go_version")
+    assert go_version
+    go_dir = f"{r.GOENV_ROOT}/versions/{go_version}/bin"
+    assert os.path.exists(go_dir)
+
+    env = {
+        "PATH": f"{go_dir}:{os.environ['PATH']}",
+    }
+
+    assert "go1.22 linux" in check_output("go version", env=env)
+
+    with tempfile.TemporaryDirectory(prefix="ynh_") as d:
+        with open("{d.name}/helloworld.go", "w") as f:
+            f.write("""
+                package main
+                import "fmt"
+                func main() { fmt.Println("hello world") }
+            """)
+        check_call("go build helloworld.go", cwd=d.name, env=env)
+        assert os.path.exists(f"{d.name}/helloworld")
+        assert "hello world" in check_output("./helloworld", cwd=d.name)
+
+
+def test_resource_composer():
+    raise NotImplementedError()

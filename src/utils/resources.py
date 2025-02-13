@@ -1567,14 +1567,302 @@ class DatabaseAppResource(AppResource):
         self._run_script(
             "deprovision",
             f"""
-ynh_{db_helper_name}_database_exists "{db_name}" && ynh_{db_helper_name}_drop_db "{db_name}" || true
-ynh_{db_helper_name}_user_exists "{db_user}" && ynh_{db_helper_name}_drop_user "{db_user}" || true
-""",
+            ynh_{db_helper_name}_database_exists "{db_name}" && ynh_{db_helper_name}_drop_db "{db_name}" || true
+            ynh_{db_helper_name}_user_exists "{db_user}" && ynh_{db_helper_name}_drop_user "{db_user}" || true
+            """,
         )
 
         self.delete_setting("db_name")
         self.delete_setting("db_user")
         self.delete_setting("db_pwd")
+
+
+class NodejsAppResource(AppResource):
+    """
+    Installs a nodejs version using "n" to be used by the app
+
+    ### Example
+    ```toml
+    [resources.nodejs]
+    version = "18.2"
+    ```
+
+    ### Properties
+    - `version`: The nodejs version needed by the app
+
+    ### Provision/Update
+    - Store "version" as "nodejs_version" in the app settings
+    - Call "n" to install the corresponding nodejs version
+    - Garbage-collect unused versions
+
+    ### Deprovision
+    - Delete the "nodejs_version" setting
+    - Garbage-collect unused versions
+    """
+
+    # Notes for future?
+    # deep_clean  -> ... trash unused versions
+    # backup -> nothing?
+    # restore -> nothing/re-provision
+
+    type = "nodejs"
+    priority = 100
+    version: str = ""
+
+    default_properties: Dict[str, Any] = {
+        "version": None,
+    }
+
+    N_INSTALL_DIR = "/opt/node_n"
+
+    def provision_or_update(self, context: Dict = {}):
+
+        self.set_setting("nodejs_version", self.version)
+        os.makedirs(self.N_INSTALL_DIR, exist_ok=True)
+
+        n = f"/usr/share/yunohost/helpers.v{self.helpers_version}.d/vendor/n"
+        cmd = f"{n} install {self.version}"
+        if system_arch() == "arm64":
+            cmd += " --arch=arm64"
+
+        self._run_script(
+            "provision_or_update", cmd, env={"N_PREFIX": self.N_INSTALL_DIR}
+        )
+        self.garbage_collect_unused_versions()
+
+    def deprovision(self, context: Dict = {}):
+
+        self.delete_setting("nodejs_version")
+        self.garbage_collect_unused_versions()
+
+    def garbage_collect_unused_versions(self):
+
+        n = f"/usr/share/yunohost/helpers.v{self.helpers_version}.d/vendor/n"
+        installed_versions = check_output(
+            f"{n} ls", env={"N_PREFIX": self.N_INSTALL_DIR}
+        )
+        installed_versions = [
+            version.split("/")[-1] for version in installed_versions.strip().split("\n")
+        ]
+
+        used_versions = []
+        from yunohost.app import app_setting, _installed_apps
+
+        for app in _installed_apps():
+            v = app_setting(app, "nodejs_version")
+            if v:
+                used_versions.append(v)
+
+        unused_versions = set(installed_versions) - set(used_versions)
+        cmds = []
+        for version in unused_versions:
+            cmds.append(f"{self.n} rm {version}")
+
+        if cmds:
+            self._run_script(
+                "cleanup", "\n".join(cmds), env={"N_PREFIX": self.N_INSTALL_DIR}
+            )
+
+
+class RubyAppResource(AppResource):
+    """
+    Installs a ruby version to be used by the app
+
+    ### Example
+    ```toml
+    [resources.ruby]
+    version = "3.2"
+    ```
+
+    ### Properties
+    - `version`: The ruby version needed by the app
+
+    ### Provision/Update
+    - FIXME: explain
+
+    ### Deprovision
+    - FIXME: explain
+    """
+
+    type = "ruby"
+    priority = 100
+    version: str = ""
+
+    default_properties: Dict[str, Any] = {
+        "version": None,
+    }
+
+    RBENV_ROOT = "/opt/rbenv"
+
+    def provision_or_update(self, context: Dict = {}):
+
+        self.update_rbenv()
+
+        final_ruby_version = check_output(
+            f"{self.RBENV_ROOT}/bin/rbenv latest --print '{self.version}'",
+            env={"RBENV_ROOT": self.RBENV_ROOT},
+        )
+        self.set_setting("ruby_version", final_ruby_version)
+        self._run_script(
+            "provision_or_update",
+            f"""
+            export RBENV_ROOT='{self.RBENV_ROOT}'
+            export RUBY_CONFIGURE_OPTS='--disable-install-doc --with-jemalloc'
+            export MAKE_OPTS='-j2'
+            {self.RBENV_ROOT}/bin/rbenv install --skip-existing '{final_ruby_version}' 2>&1"-
+            if rbenv alias --list | grep --quiet '{self.app} '; then
+                rbenv alias {self.app} --remove
+            fi
+            rbenv alias {self.app} '{final_ruby_version}'
+        """,
+        )
+        self.garbage_collect_unused_versions()
+
+    def deprovision(self, context: Dict = {}):
+
+        self.delete_setting("ruby_version")
+        self.garbage_collect_unused_versions()
+
+    def update_rbenv(self):
+
+        self._run_script(
+            "provision_or_update",
+            f"""
+            _ynh_git_clone "https://github.com/rbenv/rbenv" "{self.RBENV_ROOT}"
+            _ynh_git_clone "https://github.com/rbenv/ruby-build" "{self.RBENV_ROOT}/plugins/ruby-build"
+            _ynh_git_clone "https://github.com/tpope/rbenv-aliases" "{self.RBENV_ROOT}/plugins/rbenv-aliase"
+            _ynh_git_clone "https://github.com/momo-lab/xxenv-latest" "{self.RBENV_ROOT}/plugins/xxenv-latest"
+            mkdir -p "{self.RBENV_ROOT}/cache"
+            mkdir -p "{self.RBENV_ROOT}/shims"
+        """,
+        )
+
+    def garbage_collect_unused_versions(self):
+
+        # FIXME: implement
+        pass
+
+
+class GoAppResource(AppResource):
+    """
+    Installs a go version to be used by the app
+
+    ### Example
+    ```toml
+    [resources.go]
+    version = "1.20"
+    ```
+
+    ### Properties
+    - `version`: The go version needed by the app
+
+    ### Provision/Update
+    - FIXME: explain
+
+    ### Deprovision
+    - FIXME: explain
+    """
+
+    type = "go"
+    priority = 100
+    version: str = ""
+
+    default_properties: Dict[str, Any] = {
+        "version": None,
+    }
+
+    GOENV_ROOT = "/opt/goenv"
+
+    def provision_or_update(self, context: Dict = {}):
+
+        self.update_goenv()
+        final_go_version = check_output(
+            f"{self.GOENV_ROOT}/plugins/xxenv-latest/bin/goenv-latest --print '{self.version}'",
+            env={"GOENV_ROOT": self.GOENV_ROOT},
+        )
+        self.set_setting("go_version", final_go_version)
+        self._run_script(
+            "provision_or_update",
+            f"'{self.GOENV_ROOT}/bin/goenv' install --quiet --skip-existing '{final_go_version}' 2>&1",
+            env={"GOENV_ROOT": self.GOENV_ROOT},
+        )
+        self.garbage_collect_unused_versions()
+
+    def update_goenv(self):
+
+        self._run_script(
+            "provision_or_update",
+            f"""
+            _ynh_git_clone https://github.com/syndbg/goenv '{self.GOENV_ROOT}'
+            _ynh_git_clone https://github.com/momo-lab/xxenv-latest '{self.GOENV_ROOT}/plugins/xxenv-latest'
+            mkdir -p '{self.GOENV_ROOT}/cache'
+            mkdir -p '{self.GOENV_ROOT}/shims'
+        """,
+        )
+
+    def deprovision(self, context: Dict = {}):
+
+        self.delete_setting("go_version")
+        self.garbage_collect_unused_versions()
+
+    def garbage_collect_unused_versions(self):
+
+        installed_versions = check_output(
+            f"'{self.GOENV_ROOT}/bin/goenv' versions --bare --skip-aliases",
+            env={"GOENV_ROOT": self.GOENV_ROOT},
+        )
+        installed_versions = [
+            version
+            for version in installed_versions.strip().split("\n")
+            if "\\" not in version
+        ]
+
+        used_versions = []
+        from yunohost.app import app_setting, _installed_apps
+
+        for app in _installed_apps():
+            v = app_setting(app, "go_version")
+            if v:
+                used_versions.append(v)
+
+        unused_versions = set(installed_versions) - set(used_versions)
+        cmds = []
+        for version in unused_versions:
+            cmds.append(f"'{self.GOENV_ROOT}/bin/goenv' uninstall --force '{version}'")
+
+        if cmds:
+            self._run_script(
+                "cleanup", "\n".join(cmds), env={"GOENV_ROOT": self.GOENV_ROOT}
+            )
+
+
+class ComposerAppResource(AppResource):
+    """
+    Installs a composer version to be used by the app
+
+    ### Example
+    ```toml
+    [resources.composer]
+    version = "2.7.7"
+    ```
+
+    ### Properties
+    - `version`: The composer version needed by the app
+
+    ### Provision/Update
+    - FIXME: explain
+
+    ### Deprovision
+    - FIXME: explain
+    """
+
+    type = "composer"
+    priority = 100
+    version: str = ""
+
+    default_properties: Dict[str, Any] = {
+        "version": None,
+    }
 
 
 AppResourceClassesByType = {c.type: c for c in AppResource.__subclasses__()}

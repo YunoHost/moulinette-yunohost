@@ -41,6 +41,9 @@ trap cleanup EXIT SIGINT
 
 # =========================================================
 
+export YNH_STDINFO=1
+export YNH_ARCH=$(dpkg --print-architecture)
+
 # Dummy http server, to serve archives for ynh_setup_source
 HTTPSERVER_DIR=$(mktemp -d)
 HTTPSERVER_PORT=1312
