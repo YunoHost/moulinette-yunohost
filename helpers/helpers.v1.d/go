@@ -18,41 +18,32 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-ynh_go_try_bash_extension() {
-    if [ -x src/configure ]; then
-        src/configure && make -C src || {
-            ynh_print_info --message="Optional bash extension failed to build, but things will still work normally."
-        }
-    fi
-}
-
 goenv_install_dir="/opt/goenv"
 go_version_path="$goenv_install_dir/versions"
-# goenv_ROOT is the directory of goenv, it needs to be loaded as a environment variable.
+
+# GOENV_ROOT is the directory of goenv, it needs to be loaded as a environment variable.
 export GOENV_ROOT="$goenv_install_dir"
+export goenv_root="$goenv_install_dir"
 
 # Load the version of Go for an app, and set variables.
 #
 # ynh_use_go has to be used in any app scripts before using Go for the first time.
 # This helper will provide alias and variables to use in your scripts.
 #
-# To use gem or Go, use the alias `ynh_gem` and `ynh_go`
-# Those alias will use the correct version installed for the app
-# For example: use `ynh_gem install` instead of `gem install`
+# To use Go, use the alias `ynh_go`
+# This alias will use the correct version installed for the app
 #
-# With `sudo` or `ynh_exec_as`, use instead the fallback variables `$ynh_gem` and `$ynh_go`
+# With `sudo` or `ynh_exec_as`, use instead the fallback variables `$ynh_go`
 # And propagate $PATH to sudo with $ynh_go_load_path
-# Exemple: `ynh_exec_as $app $ynh_go_load_path $ynh_gem install`
 #
 # $PATH contains the path of the requested version of Go.
 # However, $PATH is duplicated into $go_path to outlast any manipulation of $PATH
 # You can use the variable `$ynh_go_load_path` to quickly load your Go version
 #  in $PATH for an usage into a separate script.
-# Exemple: `$ynh_go_load_path $install_dir/script_that_use_gem.sh`
 #
 #
 # Finally, to start a Go service with the correct version, 2 solutions
-#  Either the app is dependent of Go or gem, but does not called it directly.
+#  Either the app is dependent of Go, but does not called it directly.
 #  In such situation, you need to load PATH
 #    `Environment="__YNH_GO_LOAD_PATH__"`
 #    `ExecStart=__INSTALL_DIR__/my_app`
@@ -81,7 +72,6 @@ ynh_use_go() {
     # Create an alias for the specific version of Go and a variable as fallback
     ynh_go="$go_path/go"
     alias ynh_go="$ynh_go"
-
     # Load the path of this version of Go in $PATH
     if [[ :$PATH: != *":$go_path"* ]]; then
         PATH="$go_path:$PATH"
@@ -90,7 +80,7 @@ ynh_use_go() {
     ynh_go_load_path="PATH=$PATH"
 
     # Sets the local application-specific Go version
-    pushd $install_dir
+    pushd ${install_dir:-$final_path}
     $goenv_install_dir/bin/goenv local $go_version
     popd
 }
@@ -105,7 +95,7 @@ ynh_use_go() {
 # Don't forget to execute go-dependent command in a login environment
 # (e.g. sudo --login option)
 # When not possible (e.g. in systemd service definition), please use direct path
-# to goenv shims (e.g. $goenv_ROOT/shims/bundle)
+# to goenv shims (e.g. $GOENV_ROOT/shims/bundle)
 #
 # usage: ynh_install_go --go_version=go_version
 # | arg: -v, --go_version= - Version of go to install.
@@ -130,36 +120,51 @@ ynh_install_go() {
 
     # Install or update goenv
     mkdir -p $goenv_install_dir
-    pushd "$goenv_install_dir"
-    if ! [ -x "$goenv_install_dir/bin/goenv" ]; then
-        ynh_print_info --message="Downloading goenv..."
-        git init -q
-        git remote add origin https://github.com/syndbg/goenv.git
+    goenv="$(command -v goenv $goenv_install_dir/bin/goenv | grep "$goenv_install_dir/bin/goenv" | head -1)"
+    if [ -n "$goenv" ]; then
+        pushd "${goenv%/*/*}"
+        if git remote -v 2> /dev/null | grep "https://github.com/go-nv/goenv.git"; then
+            ynh_print_info --message="Updating goenv..."
+            git pull -q --tags origin master
+            ynh_go_try_bash_extension
+        else
+            ynh_print_info --message="Reinstalling goenv..."
+            cd ..
+            ynh_secure_remove --file=$goenv_install_dir
+            mkdir -p $goenv_install_dir
+            cd $goenv_install_dir
+            git init -q
+            git remote add -f -t master origin https://github.com/go-nv/goenv.git > /dev/null 2>&1
+            git checkout -q -b master origin/master
+            ynh_go_try_bash_extension
+            goenv=$goenv_install_dir/bin/goenv
+        fi
+        popd
     else
-        ynh_print_info --message="Updating goenv..."
+        ynh_print_info --message="Installing goenv..."
+        pushd $goenv_install_dir
+        git init -q
+        git remote add -f -t master origin https://github.com/go-nv/goenv.git > /dev/null 2>&1
+        git checkout -q -b master origin/master
+        ynh_go_try_bash_extension
+        goenv=$goenv_install_dir/bin/goenv
+        popd
     fi
-    git fetch -q --tags --prune origin
-    local git_latest_tag=$(git describe --tags "$(git rev-list --tags --max-count=1)")
-    git checkout -q "$git_latest_tag"
-    ynh_go_try_bash_extension
-    goenv=$goenv_install_dir/bin/goenv
-    popd
 
-    # Install or update xxenv-latest
-    goenv_latest_dir="$goenv_install_dir/plugins/xxenv-latest"
-    mkdir -p "$goenv_latest_dir"
-    pushd "$goenv_latest_dir"
-    if ! [ -x "$goenv_latest_dir/bin/goenv-latest" ]; then
-        ynh_print_info --message="Downloading xxenv-latest..."
-        git init -q
-        git remote add origin https://github.com/momo-lab/xxenv-latest.git
+    mkdir -p "${goenv_install_dir}/plugins"
+
+    goenv_latest="$(command -v "$goenv_install_dir"/plugins/*/bin/goenv-latest goenv-latest | head -1)"
+    if [ -n "$goenv_latest" ]; then
+        pushd "${goenv_latest%/*/*}"
+        if git remote -v 2> /dev/null | grep "https://github.com/momo-lab/xxenv-latest.git"; then
+            ynh_print_info --message="Updating xxenv-latest..."
+            git pull -q origin master
+        fi
+        popd
     else
-        ynh_print_info --message="Updating xxenv-latest..."
+        ynh_print_info --message="Installing xxenv-latest..."
+        git clone -q https://github.com/momo-lab/xxenv-latest.git "${goenv_install_dir}/plugins/xxenv-latest"
     fi
-    git fetch -q --tags --prune origin
-    local git_latest_tag=$(git describe --tags "$(git rev-list --tags --max-count=1)")
-    git checkout -q "$git_latest_tag"
-    popd
 
     # Enable caching
     mkdir -p "${goenv_install_dir}/cache"
@@ -174,12 +179,15 @@ ynh_install_go() {
     test -x /usr/bin/go_goenv && mv /usr/bin/go_goenv /usr/bin/go
 
     # Install the requested version of Go
-    local final_go_version=$("$goenv_latest_dir/bin/goenv-latest" --print "$go_version")
-    ynh_print_info --message="Installation of Go-$final_go_version"
-    goenv install --skip-existing "$final_go_version"
+    local final_go_version=$(goenv latest --print $go_version)
+    if [[ -z "$final_go_version" ]]; then
+        final_go_version=$go_version
+    fi
+    ynh_print_info --message="Installing Go $final_go_version"
+    goenv install --skip-existing $final_go_version > /dev/null 2>&1
 
     # Store go_version into the config of this app
-    ynh_app_setting_set --app="$app" --key="go_version" --value="$final_go_version"
+    ynh_app_setting_set --app=$app --key=go_version --value=$final_go_version
 
     # Cleanup Go versions
     ynh_cleanup_go
@@ -192,7 +200,8 @@ eval \"\$(goenv init -)\"
 #goenv" > /etc/profile.d/goenv.sh
 
     # Load the environment
-    HOME=$install_dir eval "$(goenv init -)"
+    export HOME=${HOME:-"/root/"}
+    eval "$(goenv init -)"
 }
 
 # Remove the version of Go used by the app.
@@ -201,7 +210,7 @@ eval \"\$(goenv init -)\"
 #
 # usage: ynh_remove_go
 ynh_remove_go() {
-    local go_version=$(ynh_app_setting_get --app="$app" --key="go_version")
+    local go_version=$(ynh_app_setting_get --app=$app --key=go_version)
 
     # Load goenv path in PATH
     local CLEAR_PATH="$goenv_install_dir/bin:$PATH"
@@ -210,7 +219,7 @@ ynh_remove_go() {
     PATH=$(echo $CLEAR_PATH | sed 's@/usr/local/bin:@@')
 
     # Remove the line for this app
-    ynh_app_setting_delete --app="$app" --key="go_version"
+    ynh_app_setting_delete --app=$app --key=go_version
 
     # Cleanup Go versions
     ynh_cleanup_go
@@ -226,11 +235,11 @@ ynh_remove_go() {
 ynh_cleanup_go() {
 
     # List required Go versions
-    local installed_apps=$(yunohost app list --output-as json --quiet | jq -r .apps[].id)
+    local installed_apps=$(yunohost app list | grep -oP 'id: \K.*$')
     local required_go_versions=""
     for installed_app in $installed_apps; do
         local installed_app_go_version=$(ynh_app_setting_get --app=$installed_app --key="go_version")
-        if [[ $installed_app_go_version ]]; then
+        if [[ -n "$installed_app_go_version" ]]; then
             required_go_versions="${installed_app_go_version}\n${required_go_versions}"
         fi
     done
@@ -238,17 +247,25 @@ ynh_cleanup_go() {
     # Remove no more needed Go versions
     local installed_go_versions=$(goenv versions --bare --skip-aliases | grep -Ev '/')
     for installed_go_version in $installed_go_versions; do
-        if ! $(echo ${required_go_versions} | grep "${installed_go_version}" 1> /dev/null 2>&1); then
-            ynh_print_info --message="Removing of Go-$installed_go_version"
-            $goenv_install_dir/bin/goenv uninstall --force "$installed_go_version"
+        if ! echo ${required_go_versions} | grep -q "${installed_go_version}"; then
+            ynh_print_info --message="Removing Go-$installed_go_version"
+            $goenv_install_dir/bin/goenv uninstall --force $installed_go_version
         fi
     done
 
     # If none Go version is required
-    if [[ ! $required_go_versions ]]; then
+    if [[ -z "$required_go_versions" ]]; then
         # Remove goenv environment configuration
-        ynh_print_info --message="Removing of goenv"
+        ynh_print_info --message="Removing goenv"
         ynh_secure_remove --file="$goenv_install_dir"
         ynh_secure_remove --file="/etc/profile.d/goenv.sh"
+    fi
+}
+
+ynh_go_try_bash_extension() {
+    if [ -x src/configure ]; then
+        src/configure && make -C src || {
+            ynh_print_info --message="Optional bash extension failed to build, but things will still work normally."
+        }
     fi
 }
