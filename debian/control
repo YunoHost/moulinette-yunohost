@@ -17,6 +17,7 @@ Depends: python3-all (>= 3.11),
  , python3-ldap, python3-zeroconf (>= 0.47), python3-lexicon,
  , python3-cryptography, python3-jwt, python3-passlib, python3-magic
  , python-is-python3, python3-pydantic, python3-email-validator
+ , udisks2, udisks2-bcache, udisks2-btrfs, udisks2-lvm2, udisks2-zram
  , python3-zmq
  , nginx, nginx-extras (>=1.22)
  , apt, apt-transport-https, apt-utils, aptitude, dirmngr

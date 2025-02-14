@@ -2091,3 +2091,37 @@ diagnosis:
                     help: Remove a filter (it should be an existing filter as listed with "ignore --list")
                     nargs: "*"
                     metavar: CRITERIA
+
+
+#############################
+#           Storage         #
+#############################
+storage:
+    category_help: Manage hard-drives, filesystem, pools
+    subcategories:
+        disk:
+            subcategory_help: Manage et get infos about hard-drives
+            actions:
+                # storage_disks_list
+                list:
+                    action_help: List hard-drives currently attached to this system optionnaly with infos
+                    api: GET /storage/disk/list
+                arguments:
+                    -i:
+                        full: --with-info
+                        help: Get all informations for each archive
+                        action: store_true
+                    -H:
+                        full: --human-readable
+                        help: Print sizes in human readable format
+                        action: store_true
+                info:
+                    action_help: Get hard-drive information
+                    api: GET /users/<name>
+                    arguments:
+                        name:
+                            help: Name of the hard drive as returned by 'list' command
+                    -H:
+                        full: --human-readable
+                        help: Print sizes in human readable format
+                        action: store_true
